@@ -1,32 +1,48 @@
-# Prerequisites
-*.d
+
+
+# Ignore all
+*
+
+# Unignore all with extensions
+!*.*
+
+# Unignore all dirs
+!*/
+
+#Unignore makefiles
+!**/Makefile
+!**/makefile
+
+
+# py env folder 
+**/env
+__pycache__/
+.ipynb_checkpoints/
 
 # Compiled Object files
-*.slo
-*.lo
-*.o
-*.obj
+**/*.o
 
-# Precompiled Headers
-*.gch
-*.pch
+# executables
+**/*.exe
 
-# Compiled Dynamic libraries
-*.so
-*.dylib
-*.dll
+# lib files
+**/*.d
+**/*.so
+**/*.pcm
 
 # Fortran module files
-*.mod
-*.smod
+**/*.mod
+**/*.smod
 
-# Compiled Static libraries
-*.lai
-*.la
-*.a
-*.lib
 
-# Executables
-*.exe
-*.out
-*.app
+# Result, Data, old files
+*/*.root
+**/data
+
+# temp files
+**/.directory
+**/*.log
+**/*.png
+
+# py env
+env_amd

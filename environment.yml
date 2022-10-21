@@ -21,7 +21,7 @@ dependencies:
   #  - pymysql>=1.0.1
   #  - conda-forge::python-duckdb>=0.2.8
    - uproot>=4.0.7
-   - root=6.26.6
+   - root=6.26.06
    - mako>=1.1.4
 
    # statistical tools and machine learning
