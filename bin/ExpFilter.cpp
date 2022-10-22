@@ -1,5 +1,5 @@
 
-#include "exp_gate.hh"
+#include "ExpFilter.hh"
 fs::path DIR_DATA = "/data/AMD/root_data/dec2021";
 
 struct manager
@@ -33,8 +33,8 @@ int main(int argc, char *argv[])
 
     manager manager = {reaction, mode, path_list, path_out};
     manager.init();
-    // manager.read();
-    // manager.finish();
+    manager.read();
+    manager.finish();
     return 0;
 }
 
@@ -44,10 +44,16 @@ void manager::init()
     std::ifstream pth_stream(fs::absolute(this->path_list));
     while (pth_stream >> pth_name)
     {
-        fs::path pth = DIR_DATA / (pth_name + "table" + this->mode + ".root");
+        fs::path pth = DIR_DATA / (pth_name + "_table" + this->mode + ".root");
+        std::cout << pth.string();
         if (fs::exists(pth))
         {
+            std::cout << " exist" << std::endl;
             this->data_paths.push_back(pth);
+        }
+        else
+        {
+            std::cout << " does not exist" << std::endl;
         }
     };
 
@@ -71,7 +77,6 @@ void manager::init()
     {
         reader->add_file(fs::absolute(pth));
     }
-
     reader->set_branches(branches);
 
     this->writer = new RootWriter(fs::absolute(this->path_out), "AMD");
@@ -88,7 +93,7 @@ void manager::init()
 void manager::read()
 {
     int nevents = this->reader->tree->GetEntries();
-
+    std::cout << "number of events = " << nevents << std::endl;
     std::vector<particle> hira_particles;
 
     int fmulti;

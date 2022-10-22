@@ -43,6 +43,6 @@ __pycache__/
 **/.directory
 **/*.log
 **/*.png
-
+.vscode
 # py env
 env_amd
