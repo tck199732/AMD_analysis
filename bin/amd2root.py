@@ -1,4 +1,5 @@
 import inspect
+import itertools
 import subprocess
 import pathlib
 import os
@@ -7,24 +8,26 @@ import glob
 
 project_dir = pathlib.Path(os.environ['CONDA_PREFIX']).parent
 database = pathlib.Path(project_dir, 'database')
+
 dat_dir = pathlib.Path('/data/amd/dec2021/b3fm')
 root_dir = pathlib.Path('/data/amd/dec2021/b3fm')
-list_dir = pathlib.Path(database, 'inputlist/dec2021')
+# dat_dir = pathlib.Path('/data/amd/feb2022/b10fm')
+# root_dir = pathlib.Path('/data/amd/feb2022/b10fm')
 
-# inputs
-beam = 'Ca'
-target = 'Ni'
-beamA = 48
-targetA = 64
-energy = 140
-skyrme = 'SkM'
+list_dir = pathlib.Path(database, 'inputlist/dec2021')
+# list_dir = pathlib.Path(database, 'inputlist/feb2022')
 
 ##########################################################################
-reaction = f'{beam}{beamA}{target}{targetA}E{energy}'
-rec_name = f'{beam}{beamA}{target}{targetA}En{energy}MeV_{skyrme}'
+nuclei = ['Ca40Ni58', 'Ca48Ni64', 'Ca40Sn112', 'Ca48Sn124']
+energy = [56, 140]
+skyrme = ['SkM', 'SLy4', 'SLy4_L108']
+combination = list(itertools.product(nuclei, energy, skyrme))
+reaction = [(f'{nuc}E{e}', sky) for nuc, e, sky in combination]
+rec_name = [f'{nuc}En{e}MeV_{sky}' for nuc, e, sky in combination]
+##########################################################################
 exe = pathlib.Path(str(project_dir), 'bin/amd2root')
-path_list = pathlib.Path(list_dir, f'{rec_name}.list')
-
+path_list = {rec: pathlib.Path(list_dir, f'{name}.list')
+             for rec, name in zip(reaction, rec_name)}
 
 def main():
     while not exe.exists():
@@ -56,27 +59,37 @@ def main():
 def run(mode):
 
     m = re.sub('[a-z]', '', mode)
-    with open(str(path_list), 'r') as file:
-        fl = file.readlines()
-        fl = [line for line in fl if not line.isspace()]
-        path_data = [f'{str(dat_dir)}/{fn.strip()}_table{m}.dat' for fn in fl]
-        path_out = [
-            f'{str(root_dir)}/{fn.strip()}_table{mode}.root' for fn in fl]
-        path_coll_hist = [
-            f'{str(dat_dir)}/{fn.strip()}_coll_hist.dat' for fn in fl]
-        path_amdgid = [f'{str(dat_dir)}/{fn.strip()}_amdgid.dat' for fn in fl]
+    for i, (rec, flist) in enumerate(path_list.items()):
+        if not flist.exists():
+            continue
+        with open(str(flist), 'r') as file:
+            fl = file.readlines()
+            fl = [line for line in fl if not line.isspace()]
+            path_data = [
+                pathlib.Path(f'{str(dat_dir)}/{fn.strip()}_table{m}.dat') for fn in fl]
+            path_out = [
+                pathlib.Path(f'{str(root_dir)}/{fn.strip()}_table{mode}.root') for fn in fl]
+            path_coll_hist = [
+                pathlib.Path(f'{str(dat_dir)}/{fn.strip()}_coll_hist.dat') for fn in fl]
+            path_amdgid = [
+                pathlib.Path(f'{str(dat_dir)}/{fn.strip()}_amdgid.dat') for fn in fl]
 
-    # print(path_data)
-    # print(path_out)
-    # print(path_coll_hist)
-    # print(path_amdgid)
+            # print(list(map(str, path_data)))
+            # print(list(map(str, path_out)))
+            # print(list(map(str, path_coll_hist)))
+            # print(list(map(str, path_amdgid)))
 
-    for dat, out, ch, gid in zip(path_data, path_out, path_coll_hist, path_amdgid):
-        inputs = [reaction, mode, dat, out]
-        if mode == "21t":
-            inputs.extend([ch, gid])
-        args = ' '.join(inputs)
-        subprocess.run(f'{str(exe)} {args}', shell=True, text=True)
+        for dat, out, ch, gid in zip(path_data, path_out, path_coll_hist, path_amdgid):
+            if out.exists():
+                continue
+
+            inputs = [rec[0], mode, dat, out]
+            inputs = list(map(str, inputs))
+            if mode == '21t':
+                inputs.extend([ch, gid])
+            args = ' '.join(inputs)
+            print(args)
+            subprocess.run(f'{str(exe)} {args}', shell=True, text=True)
 
 
 if __name__ == '__main__':

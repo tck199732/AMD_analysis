@@ -1,10 +1,10 @@
 
 #include "ExpFilter.hh"
-fs::path DIR_DATA = "/data/AMD/root_data/dec2021";
 
 struct manager
 {
     std::string reaction, mode;
+    fs::path data_dir;
     fs::path path_list;
     fs::path path_out;
 
@@ -28,10 +28,11 @@ int main(int argc, char *argv[])
 {
     std::string reaction = argv[1];
     std::string mode = argv[2];
-    std::string path_list = argv[3];
-    std::string path_out = argv[4];
+    std::string data_dir = argv[3];
+    std::string path_list = argv[4];
+    std::string path_out = argv[5];
 
-    manager manager = {reaction, mode, path_list, path_out};
+    manager manager = {reaction, mode, data_dir, path_list, path_out};
     manager.init();
     manager.read();
     manager.finish();
@@ -44,7 +45,7 @@ void manager::init()
     std::ifstream pth_stream(fs::absolute(this->path_list));
     while (pth_stream >> pth_name)
     {
-        fs::path pth = DIR_DATA / (pth_name + "_table" + this->mode + ".root");
+        fs::path pth = this->data_dir / (pth_name + "_table" + this->mode + ".root");
         std::cout << pth.string();
         if (fs::exists(pth))
         {
@@ -59,10 +60,10 @@ void manager::init()
 
     std::vector<branch> branches = {
         {"multi", "int"},
-        {"BSim", "double"},
-        {"pxCMS", "double[]"},
-        {"pyCMS", "double[]"},
-        {"pzCMS", "double[]"},
+        {"b", "double"},
+        {"px", "double[]"},
+        {"py", "double[]"},
+        {"pz", "double[]"},
         {"N", "int[]"},
         {"Z", "int[]"},
     };
@@ -80,6 +81,9 @@ void manager::init()
     reader->set_branches(branches);
 
     this->writer = new RootWriter(fs::absolute(this->path_out), "AMD");
+    branch br_Nc = {"Nc", "int"};
+    br_Nc.autofill();
+    branches.push_back(br_Nc);
     this->writer->set_branches("AMD", branches);
 
     this->sys_info = new system_info();
@@ -110,12 +114,12 @@ void manager::read()
         try
         {
             fmulti = std::any_cast<int>(map["multi"]);
-            bimp = std::any_cast<double>(map["BSim"]);
+            bimp = std::any_cast<double>(map["b"]);
             fn = std::any_cast<int *>(map["N"]);
             fz = std::any_cast<int *>(map["Z"]);
-            px = std::any_cast<double *>(map["pxCMS"]);
-            py = std::any_cast<double *>(map["pyCMS"]);
-            pz = std::any_cast<double *>(map["pzCMS"]);
+            px = std::any_cast<double *>(map["px"]);
+            py = std::any_cast<double *>(map["py"]);
+            pz = std::any_cast<double *>(map["pz"]);
         }
 
         catch (const std::bad_any_cast &e)
@@ -167,11 +171,12 @@ void manager::fill(const event &event)
         id++;
     }
 
+    this->writer->set("AMD", "Nc", event.Nc);
     this->writer->set("AMD", "multi", (int)event.particles.size());
-    this->writer->set("AMD", "BSim", event.bimp);
-    this->writer->set("AMD", "pxCMS", px);
-    this->writer->set("AMD", "pyCMS", py);
-    this->writer->set("AMD", "pzCMS", pz);
+    this->writer->set("AMD", "b", event.bimp);
+    this->writer->set("AMD", "px", px);
+    this->writer->set("AMD", "py", py);
+    this->writer->set("AMD", "pz", pz);
     this->writer->set("AMD", "N", N);
     this->writer->set("AMD", "Z", Z);
     this->writer->fill();

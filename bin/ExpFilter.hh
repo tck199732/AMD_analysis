@@ -82,7 +82,7 @@ void uball::init()
 void uball::config(const std::string &system)
 {
     std::ifstream stream(fs::absolute(this->e15190_uball_config));
-    std::cout << fs::exists(fs::absolute(this->e15190_uball_config)) << std::endl;
+    // std::cout << fs::exists(fs::absolute(this->e15190_uball_config)) << std::endl;
     stream.ignore(99, '\n');
     std::string line;
     while (std::getline(stream, line))
