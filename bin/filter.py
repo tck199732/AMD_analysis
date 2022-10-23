@@ -5,16 +5,17 @@ import itertools
 
 project_dir = pathlib.Path(os.environ['CONDA_PREFIX']).parent
 database = pathlib.Path(project_dir, f'database')
-list_dir = pathlib.Path(database, 'inputlist/dec2021')
-# list_dir = pathlib.Path(database, 'inputlist/feb2022')
+# list_dir = pathlib.Path(database, 'inputlist/dec2021')
+list_dir = pathlib.Path(database, 'inputlist/feb2022')
 
 exe_dir = pathlib.Path(project_dir, 'bin')
 exe = pathlib.Path(exe_dir, 'ExpFilter')
 src_dir = pathlib.Path(project_dir, 'src')
-input_dir = pathlib.Path('/data/amd/dec2021/b3fm')
-# input_dir = pathlib.Path('/data/amd/feb2022/b10fm')
-out_dir = pathlib.Path('/data/amd/dec2021/b3fm/filtered')
-# out_dir = pathlib.Path(f'/data/amd/dec2022/b10fm/filtered')
+# input_dir = pathlib.Path('/data/amd/dec2021/b3fm')
+input_dir = pathlib.Path('/data/amd/feb2022/b10fm')
+# out_dir = pathlib.Path('/data/amd/dec2021/b3fm/filtered')
+out_dir = pathlib.Path('/data/amd/feb2022/b10fm/filtered')
+print(out_dir)
 out_dir.mkdir(exist_ok=True)
 
 
@@ -29,18 +30,20 @@ path_list = {rec: pathlib.Path(list_dir, f'{name}.list')
 
 
 def main():
-
     if not exe.exists():
         os.chdir(exe_dir)
         subprocess.run(
             f'g++ ExpFilter.cpp -o ExpFilter -I`root-config --cflags --libs --glibs` -I{str(src_dir)}', shell=True)
 
     for i, (rec, rlist) in enumerate(path_list.items()):
+        if not rlist.exists():
+            continue
         for mode in ['21', '3']:
-            path_out = pathlib.Path(out_dir, f'{rec[0]}_{rec[1]}.root')
+            path_out = pathlib.Path(
+                out_dir, f'{rec[0]}_{rec[1]}_table{mode}.root')
             inputs = list(map(str, [rec[0], mode, input_dir, rlist, path_out]))
             args = ' '.join(inputs)
-            # print(f'{str(exe)} {args}')
+            print(f'{str(exe)} {args}')
             subprocess.run(f'{str(exe)} {args}', shell=True, text=True)
 
     print('All DONE')
