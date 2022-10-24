@@ -29,7 +29,7 @@ struct histograms
 void histograms::init()
 {
     this->h2_multi_b = new TH2D(
-        Form("h2_multi_b_%s", this->mode.c_str()), "", 80, -0.5, 80.5, 1000, 0., 10.);
+        Form("h2_multi_b_mode%s", this->mode.c_str()), "", 80, -0.5, 80.5, 1000, 0., 10.);
     this->h2_multi_b->SetDirectory(0);
 }
 void histograms::write()
@@ -109,6 +109,7 @@ void manager::init()
     this->betacms = sys_info->get_betacms(this->reaction);
     this->rapidity_beam = sys_info->get_rapidity_beam(this->reaction);
 
+    this->hist = {this->reaction, this->mode};
     this->hist.init();
 }
 

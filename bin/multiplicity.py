@@ -17,13 +17,19 @@ reaction = 'Ca48Ni64'
 energy = 140
 mode = '3'
 skyrme = 'SkM'
+
+
 def main():
-    path_data = pathlib.Path(input_dir, f'{reaction}E{energy}_{skyrme}_table{mode}.root')
-    path_out = pathlib.Path(out_dir, f'{reaction}E{energy}_{skyrme}_b10fm.root')
-    inputs = list(map(str, [f'{reaction}E{energy}', mode, path_data,path_out]))
+    path_data = pathlib.Path(
+        input_dir, f'{reaction}E{energy}_{skyrme}_table{mode}.root')
+    path_out = pathlib.Path(
+        out_dir, f'{reaction}E{energy}_{skyrme}_table{mode}_b10fm.root')
+    inputs = list(
+        map(str, [f'{reaction}E{energy}', mode, path_data, path_out]))
     args = ' '.join(inputs)
-    print(f'{str(exe)} {args}')
+    # print(f'{str(exe)} {args}')
     subprocess.run(f'{str(exe)} {args}', shell=True, text=True)
-    
+
+
 if __name__ == '__main__':
     main()

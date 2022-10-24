@@ -46,3 +46,4 @@ __pycache__/
 .vscode
 # py env
 env_amd
+result
