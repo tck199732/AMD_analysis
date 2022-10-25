@@ -33,11 +33,12 @@ struct histograms
     std::vector<std::string> particlenames = {
         "n", "p", "d", "t", "3He", "4He", "coal_n", "coal_p"};
 
+    double betacms, beam_rapidity;
     double norm = 0.0;
     std::map<std::string, TH2D *> h2_pta_rapidity_lab;
     void init();
-    void fill(const event &event, const std::string &mode, const double &weight);
-    // void replace_error();
+    void fill(const event &event, const double &weight);
+    void normalize();
     void write();
 };
 
