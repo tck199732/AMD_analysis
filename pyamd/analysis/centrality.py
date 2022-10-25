@@ -1,6 +1,5 @@
 import pathlib
 import os
-from re import X
 import sys
 import functools
 import pandas as pd

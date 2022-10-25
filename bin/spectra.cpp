@@ -17,7 +17,7 @@ struct manager
     histograms hist21;
     histograms hist3;
     histograms hist3_ndecay1;
-    eventcut eventcut;
+    eventcut event_cut;
     TFile *outputfile;
 
     void init();
@@ -35,7 +35,7 @@ int main(int argc, char *argv[])
     int Ncmin = 1;
     int Ncmax = 25;
     double bmin = 0.0;
-    double bmax = 0.0;
+    double bmax = 3.0;
     if (argc <= 6)
     {
         Ncmin = std::stoi(argv[5]);
@@ -99,7 +99,7 @@ void manager::init()
     this->betacms = sys_info->get_betacms(this->reaction);
     this->rapidity_beam = sys_info->get_rapidity_beam(this->reaction);
 
-    this->eventcut = {{this->Ncmin, this->Ncmax}, {this->bmin, this->bmax}};
+    this->event_cut = {{this->Ncmin, this->Ncmax}, {this->bmin, this->bmax}};
 
     this->hist21 = {this->reaction, "prim"};
     this->hist3 = {this->reaction, "seq"};
@@ -159,7 +159,7 @@ void manager::read()
             }
 
             event event = {Nc, bimp, particles};
-            if (this->eventcut.pass(event))
+            if (this->event_cut.pass(event))
             {
                 weight += 1.;
                 if (ndecay == 0)
@@ -199,7 +199,7 @@ void manager::read()
         }
 
         event event = {Nc, bimp, particles};
-        if (this->eventcut.pass(event))
+        if (this->event_cut.pass(event))
         {
             this->hist21.fill(event, weight);
             this->hist21.norm += weight;
