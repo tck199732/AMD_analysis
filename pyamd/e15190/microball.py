@@ -13,7 +13,7 @@ class microball:
     def __init__(self, path=None, coordinate='uball'):
         if path is None:
             self.path = pathlib.Path(
-                PROJECT_DIR, 'database/microball//acceptance/uball_geometry.dat')
+                PROJECT_DIR, 'database/microball/acceptance/uball_geometry.dat')
         else:
             self.path = pathlib.Path(path)
         self.read_geometry()

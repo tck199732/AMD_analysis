@@ -50,38 +50,6 @@ class HistogramReader:
 
         return df if keep_zeros else df.query(f'{zname} != 0.0').reset_index(drop=True)
 
-    def hist2d_to_df_root(self, histo, xname='x', yname='y', zname='z', keep_zeros=True):
-
-        df = pd.DataFrame()
-        xx = []
-        yy = []
-        zz = []
-        err = []
-        for binx in range(1, histo.GetNbinsX() + 1):
-            x = histo.GetXaxis().GetBinCenter(binx)
-            for biny in range(1, histo.GetNbinsY() + 1):
-                y = histo.GetYaxis().GetBinCenter(biny)
-                content = histo.GetBinContent(binx, biny)
-                error = histo.GetBinError(binx, biny)
-                xx.append(x)
-                yy.append(y)
-                zz.append(content)
-                err.append(error)
-        df = pd.DataFrame({
-            xname: xx,
-            yname: yy,
-            zname: zz,
-            f'{zname}_err': err
-        })
-
-        mask = (df[zname] != 0.0)
-        df[f'{zname}_ferr'] = np.where(
-            mask,
-            np.abs(df[f'{zname}_err'] / df[zname]),
-            0.0
-        )
-        return df if keep_zeros else df.query(f'{zname} != 0.0').reset_index(drop=True)
-
     def hist2d_to_df(self, histo, xname='x', yname='y', zname='z', keep_zeros=True):
         x = np.array([histo.GetXaxis().GetBinCenter(b)
                      for b in range(1, histo.GetNbinsX() + 1)])
@@ -111,39 +79,6 @@ class HistogramReader:
             0.0
         )
         return df if keep_zeros else df.query(f'{zname} != 0.0').reset_index(drop=True)
-
-        '''
-        
-        
-        
-        df = dict()
-        
-        x = np.array([hist.GetXaxis().GetBinCenter(b) for b in range(1, hist.GetNbinsX() + 1)])
-        y = np.array([hist.GetYaxis().GetBinCenter(b) for b in range(1, hist.GetNbinsY() + 1)])
-        
-        # bin 0 = underflow, bin lastbin + 1  = overflow in each axis
-        content = np.array([hist.GetBinContent(b) for b in range((len(x)+2)*(len(y)+2))])
-        content = content.reshape(len(x) + 2, len(y) + 2, order = 'C')
-        content = content[1:-1, 1:-1]
-        error = np.array([hist.GetBinError(b) for b in range((len(x)+2)*(len(y)+2))])
-        error = error.reshape(len(x) + 2, len(y) + 2, order = 'C')
-        error = error[1:-1, 1:-1]
-        
-        xx, yy = np.meshgrid(x, y, indexing = 'xy')
-        df = pd.DataFrame({
-            xname : xx.flatten(),
-            yname : yy.flatten(),
-            zname : content.flatten(),
-            f'{zname}_err' : error.flatten()
-        })
-        
-        condition = (df[zname] != 0.0)
-        df[f'{zname}_ferr'] = np.where(condition, np.abs(df[f'{zname}_err']/df[zname]), 0.0)
-        
-        return df
-        #return df if keep_zeros else df.query(f'{zname} != 0.0')
-        #return df if keep_zeros else df.query(f'{zname} != 0.0').reset_index(drop=True)
-        '''
 
     def graph_to_df(self, grer, xname='x', yname='y', keep_zeros=True):
         df = dict()

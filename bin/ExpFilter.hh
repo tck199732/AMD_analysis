@@ -9,7 +9,7 @@
 #include <filesystem>
 namespace fs = std::filesystem;
 
-fs::path PROJECT_DIR = "/home/kin/Desktop/amd_master";
+fs::path PROJECT_DIR = "/home/kin/Desktop/amd_analysis";
 
 struct event
 {
@@ -20,10 +20,10 @@ struct event
 
 struct hira
 {
-    std::vector<std::array<double, 2>> Ekinlabcut = {
-        {20., 200.}, {20.0, 198.0}, {15.0, 263.0 / 2}, {12.0, 312 / 3.}, {20., 200.}, {18., 200.}, {0., 1000.}}; // MeV/A
+    std::map<std::string, std::array<double, 2>> Ekinlabcut;
     std::array<double, 2> thetalabcut = {30., 75.};
     std::array<double, 2> philabcut = {0, 360};
+    void init();
     bool pass_ekinlab(const particle &particle);
     bool pass_angle(const particle &particle);
 };
@@ -39,10 +39,22 @@ struct uball
     void read_particle(const particle &particle);
 };
 
+void hira::init()
+{
+    this->Ekinlabcut["p"] = {20.0, 198.0};
+    this->Ekinlabcut["d"] = {15.0, 263.0 / 2};
+    this->Ekinlabcut["t"] = {12.0, 312 / 3.};
+    this->Ekinlabcut["3He"] = {20.0, 200.0};
+    this->Ekinlabcut["4He"] = {18.0, 200.0};
+}
+
 bool hira::pass_ekinlab(const particle &particle)
 {
-    int pid = std::min(particle.pid, 6);
-    return (particle.ekinlab >= this->Ekinlabcut[pid][0] && particle.ekinlab <= this->Ekinlabcut[pid][1]);
+    if (this->Ekinlabcut.count(particle.name) == 0)
+    {
+        return 0;
+    }
+    return (particle.ekinlab >= this->Ekinlabcut[particle.name][0] && particle.ekinlab <= this->Ekinlabcut[particle.name][1]);
 }
 bool hira::pass_angle(const particle &particle)
 {
@@ -82,7 +94,6 @@ void uball::init()
 void uball::config(const std::string &system)
 {
     std::ifstream stream(fs::absolute(this->e15190_uball_config));
-    // std::cout << fs::exists(fs::absolute(this->e15190_uball_config)) << std::endl;
     stream.ignore(99, '\n');
     std::string line;
     while (std::getline(stream, line))

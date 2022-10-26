@@ -19,7 +19,6 @@ void particle::autofill(const double &betacms)
 
     if (this->coordinate == "hira")
     {
-        //         std::cout << "im using hira coordiante" << std::endl;
         if (this->phi < 0)
         {
             this->phi += 360.;
@@ -31,7 +30,6 @@ void particle::autofill(const double &betacms)
     }
     else if (this->coordinate == "uball")
     {
-        //         std::cout << "im using uball coordiante" << std::endl;
         if (this->phi < -18.)
         {
             this->phi += 360.;

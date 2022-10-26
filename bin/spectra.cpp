@@ -1,6 +1,8 @@
 
 #include "spectra.hh"
 
+#include <thread>
+#include <chrono>
 struct manager
 {
     std::string reaction;
@@ -19,6 +21,8 @@ struct manager
     histograms hist3_ndecay1;
     eventcut event_cut;
     TFile *outputfile;
+
+    int nevents21, nevents3;
 
     void init();
     void read();
@@ -46,14 +50,14 @@ int main(int argc, char *argv[])
     }
     if (argc <= 8)
     {
-        Ncmin = std::stod(argv[7]);
+        bmin = std::stod(argv[7]);
     }
     if (argc <= 9)
     {
-        Ncmin = std::stod(argv[8]);
+        bmax = std::stod(argv[8]);
     }
 
-    manager manager = {reaction, path_data21, path_data3, path_out};
+    manager manager = {reaction, path_data21, path_data3, path_out, Ncmin, Ncmax, bmin, bmax};
     manager.init();
     manager.read();
     manager.replace_error();
@@ -101,23 +105,21 @@ void manager::init()
 
     this->event_cut = {{this->Ncmin, this->Ncmax}, {this->bmin, this->bmax}};
 
-    this->hist21 = {this->reaction, "prim"};
-    this->hist3 = {this->reaction, "seq"};
-    this->hist3_ndecay1 = {this->reaction, "seq1"};
+    this->hist21 = {this->reaction, "prim", this->betacms, this->rapidity_beam};
+    this->hist3 = {this->reaction, "seq", this->betacms, this->rapidity_beam};
+    this->hist3_ndecay1 = {this->reaction, "seq1", this->betacms, this->rapidity_beam};
 
     this->hist21.init();
     this->hist3.init();
     this->hist3_ndecay1.init();
+    this->nevents21 = this->reader21->tree->GetEntries();
+    this->nevents3 = this->reader21->tree->GetEntries();
+    std::cout << "number of events = " << nevents21 << std::endl;
 }
 
 void manager::read()
 {
-    int nevents21 = this->reader21->tree->GetEntries();
-    int nevents3 = this->reader21->tree->GetEntries();
-    std::cout << "number of events = " << nevents21 << std::endl;
-
-    int decays = nevents3 / nevents21;
-
+    int ndecays = this->nevents3 / this->nevents21;
     int Nc, multi;
     double bimp;
     int *fz;
@@ -125,12 +127,11 @@ void manager::read()
     double *px;
     double *py;
     double *pz;
-    std::vector<particle> particles;
 
     for (int ievt21 = 0; ievt21 < nevents21; ievt21++)
     {
-        double weight;
-        for (int ndecay = 0; ndecay < 10; ndecay++)
+        double weight = 0.;
+        for (int ndecay = 0; ndecay < ndecays; ndecay++)
         {
             int ievt3 = ievt21 + ndecay * nevents21;
             std::map<std::string, std::any> map = this->reader3->get_entry(ievt3);
@@ -151,28 +152,30 @@ void manager::read()
                 std::cout << e.what() << '\n';
             }
 
-            for (unsigned int i = 0; i < multi; i++)
+            event event3 = {Nc, bimp};
+            if (!this->event_cut.pass(event3))
             {
-                particle particle{fn[i], fz[i], px[i], py[i], pz[i]};
-                particle.autofill(this->betacms);
-                particles.push_back(particle);
+                continue;
             }
 
-            event event = {Nc, bimp, particles};
-            if (this->event_cut.pass(event))
+            for (unsigned int i = 0; i < multi; i++)
             {
-                weight += 1.;
-                if (ndecay == 0)
-                {
-                    this->hist3_ndecay1.fill(event, 1.);
-                    this->hist3_ndecay1.norm += 1.;
-                }
-                this->hist3.fill(event, 1. / decays);
-                this->hist3.norm += 1.;
+                particle particle = {fn[i], fz[i], px[i], py[i], pz[i]};
+                particle.autofill(this->betacms);
+                event3.particles.push_back(particle);
             }
-            particles.clear();
+
+            weight += 1.;
+            if (ndecay == 0)
+            {
+                this->hist3_ndecay1.fill(event3, 1.);
+                this->hist3_ndecay1.norm += 1.;
+            }
+            this->hist3.fill(event3, 1. / ndecays);
+            this->hist3.norm += 1.;
         }
-        weight /= decays;
+        weight /= ndecays;
+
         std::map<std::string, std::any> map = this->reader21->get_entry(ievt21);
         try
         {
@@ -191,20 +194,20 @@ void manager::read()
             std::cout << e.what() << '\n';
         }
 
+        event event21 = {Nc, bimp};
+        if (!this->event_cut.pass(event21))
+        {
+            continue;
+        }
         for (unsigned int i = 0; i < multi; i++)
         {
-            particle particle{fn[i], fz[i], px[i], py[i], pz[i]};
+            particle particle = {fn[i], fz[i], px[i], py[i], pz[i]};
             particle.autofill(this->betacms);
-            particles.push_back(particle);
+            event21.particles.push_back(particle);
         }
 
-        event event = {Nc, bimp, particles};
-        if (this->event_cut.pass(event))
-        {
-            this->hist21.fill(event, weight);
-            this->hist21.norm += weight;
-        }
-        particles.clear();
+        this->hist21.fill(event21, weight);
+        this->hist21.norm += weight;
     }
 }
 

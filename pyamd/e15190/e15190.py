@@ -58,4 +58,3 @@ class reaction:
         beam_ke = self.beam_energy * self.beamA
         mom_beam = np.sqrt(beam_ke**2 + 2*beam_ke * self.beam_mass)
         return 0.5 * np.log((beam_ke + self.beam_mass + mom_beam) / (beam_ke + self.beam_mass - mom_beam))
-        # return get_rapidity(beam_ke, self.beam_mass, mom_beam)

@@ -90,6 +90,7 @@ void manager::init()
     this->betacms = sys_info->get_betacms(this->reaction);
     this->rapidity_beam = sys_info->get_rapidity_beam(this->reaction);
 
+    this->det_hira.init();
     this->det_uball.init();
     this->det_uball.config(this->reaction);
 }

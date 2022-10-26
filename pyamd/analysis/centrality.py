@@ -1,13 +1,10 @@
 import pathlib
 import os
-import sys
-import functools
 import pandas as pd
 import numpy as np
+import pathlib
 import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit
-from astropy import modeling
-import subprocess
 from copy import copy
 
 import pyamd
@@ -21,8 +18,7 @@ helper = helper.helper()
 
 class MultiplicityFile:
     def __init__(self, path):
-        self.path = pathlib.Path(__file__).parent.resolve()
-        self.path = pathlib.Path(self.path, path).resolve()
+        self.path = pathlib.Path(path).resolve()
 
     def get_names(self):
         if not self.path.exists():
@@ -47,19 +43,19 @@ class MultiplicityFile:
 
 
 class Multiplicity_ImpactParameter:
-    DIR = f'{PROJECT_DIR}/multiplicity_analysis/result'
+    DIR = f'{PROJECT_DIR}/result/multiplicity'
 
-    def __init__(self, path=None, reaction='Ca48Ni64E140', skyrme='SkM', impact_parameter=(0., 10.), mode='all'):
+    def __init__(self, path=None, reaction='Ca48Ni64E140', skyrme='SkM', impact_parameter=(0., 10.), mode='3'):
 
         self.betacms = e15190.reaction(reaction).get_betacms()
         self.beam_rapidity = e15190.reaction(reaction).get_rapidity_beam()
         self.reaction = reaction
 
         if path is None:
-            path = f'{self.DIR}/amd_{reaction}_{skyrme}_bmin{impact_parameter[0]:.1f}_bmax{impact_parameter[1]:.1f}.root'
+            path = f'{self.DIR}/{reaction}_{skyrme}_table{mode}_b{impact_parameter[1]:.0f}fm.root'
 
         spectrafile = MultiplicityFile(path)
-        self.df = spectrafile.get_histogram(keyword=f'h2_multi_b_{mode}')
+        self.df = spectrafile.get_histogram(keyword=f'h2_multi_b')
         self.df = hist_reader.hist2d_to_df(self.df)
 
     def MultiplicitySpectra(self, range=(-0.5, 24.5), cut=(0., 10.), bins=25):
@@ -68,7 +64,9 @@ class Multiplicity_ImpactParameter:
         binwidth = np.diff(df['y'][0:2])
         cut1 = cut[0] - binwidth/2.
         cut2 = cut[1] + binwidth/2.
-        df.query(f'y >= {cut1} & y < {cut2}', inplace=True)
+
+        df.query('z > 0 ', inplace=True)
+        df.query(f'y >= {float(cut1)} & y < {float(cut2)}', inplace=True)
 
         hist, bin_edges = np.histogram(
             df['x'], weights=df['z'], range=range, bins=bins)

@@ -8,7 +8,7 @@ database = pathlib.Path(project_dir, f'database')
 
 exe_dir = pathlib.Path(project_dir, 'bin')
 src_dir = pathlib.Path(project_dir, 'src')
-exe = pathlib.Path(exe_dir, 'spectra.cpp')
+path_main = pathlib.Path(exe_dir, 'spectra.cpp')
 
 input_dir = pathlib.Path('/data/amd/dec2021/b3fm/filtered')
 out_dir = pathlib.Path(project_dir, 'result/spectra')
@@ -26,8 +26,9 @@ def main():
                               capture_output=True, shell=True, text=True, encoding='utf-8')
     root_inc = root_inc.stdout.strip()
 
+    exe = pathlib.Path(exe_dir, path_main.stem)
     subprocess.run(
-        f'g++ {str(exe)} -o {str(exe.stem)} -I{root_inc} -I{str(src_dir)}', shell=True, text=True)
+        f'g++ {str(path_main)} -o {str(exe)} -I{root_inc} -I{str(src_dir)}', shell=True, text=True)
 
     path_data21 = pathlib.Path(
         input_dir, f'{reaction}E{energy}_{skyrme}_table21.root')
@@ -41,7 +42,7 @@ def main():
         map(str, [f'{reaction}E{energy}', path_data21, path_data3, path_out, *Nc, *bimp]))
     args = ' '.join(inputs)
     print(f'{str(exe)} {args}')
-    # subprocess.run(f'{str(exe)} {args}', shell=True, text=True)
+    subprocess.run(f'{str(exe)} {args}', shell=True, text=True)
 
 
 if __name__ == '__main__':

@@ -30,10 +30,11 @@ struct eventcut
 struct histograms
 {
     std::string reaction, tag;
+    double betacms, beam_rapidity;
+
     std::vector<std::string> particlenames = {
         "n", "p", "d", "t", "3He", "4He", "coal_n", "coal_p"};
 
-    double betacms, beam_rapidity;
     double norm = 0.0;
     std::map<std::string, TH2D *> h2_pta_rapidity_lab;
     void init();
@@ -75,7 +76,7 @@ void histograms::fill(const event &event, const double &weight)
     {
         if (this->h2_pta_rapidity_lab.count(par.name) == 1)
         {
-            this->h2_pta_rapidity_lab[par.name]->Fill(par.rapidity_lab, par.pt, weight);
+            this->h2_pta_rapidity_lab[par.name]->Fill(par.rapidity_lab / this->beam_rapidity, par.pt, weight);
 
             if (h2_pta_rapidity_lab.count("coal_p") == 1)
             {

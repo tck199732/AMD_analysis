@@ -20,9 +20,11 @@ struct event
 struct histograms
 {
     std::string reaction, mode;
+    double norm = 0.;
     TH2D *h2_multi_b;
     void init();
     void fill(const event &event);
+    void normalize();
     void write();
 };
 
@@ -45,8 +47,13 @@ void histograms::fill(const event &event)
         weight = 1. / 10;
     }
     this->h2_multi_b->Fill(event.Nc, event.bimp, weight);
+    this->norm += 1.;
 }
 
+void histograms::normalize()
+{
+    this->h2_multi_b->Scale(1. / this->norm);
+}
 struct manager
 {
     std::string reaction, mode;
@@ -173,6 +180,7 @@ void manager::fill(const event &event)
 void manager::finish()
 {
     this->outputfile = new TFile(this->path_out.c_str(), "RECREATE");
+    this->hist.normalize();
     this->hist.write();
     this->outputfile->Write();
     std::cout << "DONE" << std::endl;

@@ -21,7 +21,7 @@ This repository is developed in Python 3.8.10 and C++17 (`-std=c++17` in GCC 9.4
 - [**`src/`**](src/): C++ source files for analyzing output of AMD simulation.
 - [**`bin/`**](bin/): C++ main program for analyzing output of AMD simulation.
 - [**`pyamd/`**](pyamd/): python source files for analyzing output from C++ main program.
-- **`pynb/`**](pynb/): jupyter notebook files for illustrating the analysis and results.
+<!-- - **`pynb/`**](pynb/): jupyter notebook files for illustrating the analysis and results. -->
 - [**`build.py`**](build.py): For setting up conda environment with ROOT ver 6.26.06, see environment.yml.
 
 ## 3. Procedures
