@@ -99,23 +99,23 @@ std::map<std::string, std::any> RootReader::get_entry(int iEvt)
 
     this->tree->GetEntry(iEvt);
     std::map<std::string, std::any> buffer;
-    for (auto &[name, branch] : this->branches)
+    for (auto &[name, br] : this->branches)
     {
-        if (branch.type == "int")
+        if (br.type == "int")
         {
-            buffer[branch.name] = *static_cast<int *>(branch.value);
+            buffer[br.name] = *static_cast<int *>(br.value);
         }
-        else if (branch.type == "double")
+        else if (br.type == "double")
         {
-            buffer[branch.name] = *static_cast<double *>(branch.value);
+            buffer[br.name] = *static_cast<double *>(br.value);
         }
-        else if (branch.type == "int[]")
+        else if (br.type == "int[]")
         {
-            buffer[branch.name] = static_cast<int *>(branch.value);
+            buffer[br.name] = static_cast<int *>(br.value);
         }
-        else if (branch.type == "double[]")
+        else if (br.type == "double[]")
         {
-            buffer[branch.name] = static_cast<double *>(branch.value);
+            buffer[br.name] = static_cast<double *>(br.value);
         }
     }
     return buffer;
@@ -123,7 +123,6 @@ std::map<std::string, std::any> RootReader::get_entry(int iEvt)
 
 RootWriter::RootWriter(const std::string &path, const std::string &tr_name, const std::string &option)
 {
-    //     this->path = std::filesystem::path(path);
     this->path = path;
     this->file = new TFile(path.c_str(), option.c_str());
     this->trees[tr_name].ttree = new TTree(tr_name.c_str(), tr_name.c_str());
@@ -131,7 +130,6 @@ RootWriter::RootWriter(const std::string &path, const std::string &tr_name, cons
 
 RootWriter::RootWriter(const std::string &path, const std::initializer_list<std::string> &tr_names, const std::string &option)
 {
-    //     this->path = std::filesystem::path(path);
     this->path = path;
     this->file = new TFile(path.c_str(), option.c_str());
     for (auto &tr_name : tr_names)
@@ -233,7 +231,7 @@ void RootWriter::set(const std::string &tr_name, const std::string &br_name, int
 
 void RootWriter::fill()
 {
-    for (auto &[tr_name, tree] : this->trees)
+    for (auto &[tr_name, tr] : this->trees)
     {
         this->trees[tr_name].ttree->Fill();
     }

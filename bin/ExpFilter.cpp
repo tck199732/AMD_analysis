@@ -58,17 +58,17 @@ void manager::init()
         }
     };
 
-    std::vector<branch> branches = {
+    std::vector<branch> rbranches = {
         {"multi", "int"},
         {"b", "double"},
-        {"px", "double[]"},
-        {"py", "double[]"},
-        {"pz", "double[]"},
-        {"N", "int[]"},
-        {"Z", "int[]"},
+        {"px", "double[multi]"},
+        {"py", "double[multi]"},
+        {"pz", "double[multi]"},
+        {"N", "int[multi]"},
+        {"Z", "int[multi]"},
     };
 
-    for (auto &br : branches)
+    for (auto &br : rbranches)
     {
         br.autofill();
     }
@@ -78,19 +78,38 @@ void manager::init()
     {
         reader->add_file(fs::absolute(pth));
     }
-    reader->set_branches(branches);
+    reader->set_branches(rbranches);
 
     this->writer = new RootWriter(fs::absolute(this->path_out), "AMD");
-    branch br_Nc = {"Nc", "int"};
-    br_Nc.autofill();
-    branches.push_back(br_Nc);
-    this->writer->set_branches("AMD", branches);
+
+    std::vector<branch> wbranches = {
+        {"multi", "int"},
+        {"b", "double"},
+        {"px", "double[multi]"},
+        {"py", "double[multi]"},
+        {"pz", "double[multi]"},
+        {"N", "int[multi]"},
+        {"Z", "int[multi]"},
+        {"Nc", "int"},
+    };
+
+    for (auto &br : wbranches)
+    {
+        br.autofill();
+    }
+    this->writer->set_branches("AMD", wbranches);
 
     this->sys_info = new system_info();
     this->betacms = sys_info->get_betacms(this->reaction);
     this->rapidity_beam = sys_info->get_rapidity_beam(this->reaction);
 
     this->det_hira.init();
+
+    for (auto &[pn, cut] : det_hira.Ekinlabcut)
+    {
+        std::cout << pn << "\t" << cut[0] << "\t" << cut[1] << std::endl;
+    }
+
     this->det_uball.init();
     this->det_uball.config(this->reaction);
 }
@@ -99,7 +118,6 @@ void manager::read()
 {
     int nevents = this->reader->tree->GetEntries();
     std::cout << "number of events = " << nevents << std::endl;
-    std::vector<particle> hira_particles;
 
     int fmulti;
     double bimp;
@@ -130,23 +148,21 @@ void manager::read()
 
         this->det_uball.reset();
 
+        event event;
         for (unsigned int i = 0; i < fmulti; i++)
         {
-            particle particle{fn[i], fz[i], px[i], py[i], pz[i]};
+            particle particle = {fn[i], fz[i], px[i], py[i], pz[i]};
             particle.autofill(this->betacms);
             this->det_uball.read_particle(particle);
-
             if (this->det_hira.pass_angle(particle) && this->det_hira.pass_ekinlab(particle))
             {
-                hira_particles.push_back(particle);
+                event.particles.push_back(particle);
             }
         }
 
-        int Nc = this->det_uball.counter;
-        event event = {Nc, bimp, hira_particles};
-
+        event.Nc = this->det_uball.counter;
+        event.bimp = bimp;
         this->fill(event);
-        hira_particles.clear();
     }
 }
 
@@ -161,15 +177,13 @@ void manager::fill(const event &event)
     };
     resize(px, py, pz, N, Z);
 
-    int id = 0;
-    for (const auto &particle : event.particles)
+    for (unsigned int i = 0; i < event.particles.size(); i++)
     {
-        px[id] = particle.px;
-        py[id] = particle.py;
-        pz[id] = particle.pz;
-        N[id] = particle.nid;
-        Z[id] = particle.zid;
-        id++;
+        px[i] = event.particles[i].px;
+        py[i] = event.particles[i].py;
+        pz[i] = event.particles[i].pz;
+        N[i] = event.particles[i].nid;
+        Z[i] = event.particles[i].zid;
     }
 
     this->writer->set("AMD", "Nc", event.Nc);
@@ -180,7 +194,8 @@ void manager::fill(const event &event)
     this->writer->set("AMD", "pz", pz);
     this->writer->set("AMD", "N", N);
     this->writer->set("AMD", "Z", Z);
-    this->writer->fill();
+
+    this->writer->fill("AMD");
 }
 
 void manager::finish()
