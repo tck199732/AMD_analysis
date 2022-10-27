@@ -6,6 +6,16 @@ void branch::autofill()
     {
         int pos = std::find(this->type.begin(), this->type.end(), '[') - this->type.begin();
         std::string size_char = this->type.substr(pos + 1, this->type.length() - pos - 2);
+
+        if (size_char == "")
+        {
+            size_char = to_string(this->MAX_MULTI);
+        }
+        if (int(size_char) > this->MAX_MULTI)
+        {
+            throw std::invalid_argument("branch array size larger than limit.");
+        }
+
         char type_char = toupper(this->type[0]);
         this->leaflist = Form("%s[%s]/%c", this->name.c_str(), size_char.c_str(), type_char);
         this->type = this->type.substr(0, pos) + "[]";
