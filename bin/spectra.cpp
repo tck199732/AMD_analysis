@@ -80,11 +80,11 @@ void manager::init()
         {"Nc", "int"},
         {"multi", "int"},
         {"b", "double"},
-        {"px", "double[]"},
-        {"py", "double[]"},
-        {"pz", "double[]"},
-        {"N", "int[]"},
-        {"Z", "int[]"},
+        {"px", "double[multi]"},
+        {"py", "double[multi]"},
+        {"pz", "double[multi]"},
+        {"N", "int[multi]"},
+        {"Z", "int[multi]"},
     };
 
     for (auto &br : branches)
@@ -113,13 +113,14 @@ void manager::init()
     this->hist3.init();
     this->hist3_ndecay1.init();
     this->nevents21 = this->reader21->tree->GetEntries();
-    this->nevents3 = this->reader21->tree->GetEntries();
+    this->nevents3 = this->reader3->tree->GetEntries();
     std::cout << "number of events = " << nevents21 << std::endl;
 }
 
 void manager::read()
 {
     int ndecays = this->nevents3 / this->nevents21;
+    std::cout << "ndecays : " << ndecays << std::endl;
     int Nc, multi;
     double bimp;
     int *fz;
@@ -174,6 +175,7 @@ void manager::read()
             this->hist3.fill(event3, 1. / ndecays);
             this->hist3.norm += 1.;
         }
+        this->hist3.norm /= ndecays;
         weight /= ndecays;
 
         std::map<std::string, std::any> map = this->reader21->get_entry(ievt21);

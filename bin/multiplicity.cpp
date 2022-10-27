@@ -10,6 +10,7 @@
 #include "../src/root_io.cpp"
 #include "../src/system_info.cpp"
 
+const int ndecays = 10;
 struct event
 {
     int Nc;
@@ -44,7 +45,7 @@ void histograms::fill(const event &event)
     double weight = 1.;
     if (this->mode == "3")
     {
-        weight = 1. / 10;
+        weight = 1. / ndecays;
     }
     this->h2_multi_b->Fill(event.Nc, event.bimp, weight);
     this->norm += 1.;
@@ -52,6 +53,10 @@ void histograms::fill(const event &event)
 
 void histograms::normalize()
 {
+    if (this->mode == "3")
+    {
+        this->norm /= ndecays;
+    }
     this->h2_multi_b->Scale(1. / this->norm);
 }
 struct manager
@@ -96,11 +101,11 @@ void manager::init()
         {"Nc", "int"},
         {"multi", "int"},
         {"b", "double"},
-        {"px", "double[]"},
-        {"py", "double[]"},
-        {"pz", "double[]"},
-        {"N", "int[]"},
-        {"Z", "int[]"},
+        {"px", "double[multi]"},
+        {"py", "double[multi]"},
+        {"pz", "double[multi]"},
+        {"N", "int[multi]"},
+        {"Z", "int[multi]"},
     };
 
     for (auto &br : branches)

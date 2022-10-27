@@ -63,9 +63,6 @@ class microball:
                 8: [1, 2, 3,    5, 6, 7, 8, 9, 10],
             }
 
-        #path = "./acceptance/e15190_config.dat"
-        # df = pd.read_csv(path, delim_whitespace = True, comment = '#', index_col = False)
-
     def draw_geometry(self, **kwargs):
         fig, ax = plt.subplots(**kwargs)
         cm = plt.cm.viridis(np.linspace(0.3, 1, len(self.config)))
