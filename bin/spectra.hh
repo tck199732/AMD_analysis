@@ -38,6 +38,7 @@ struct histograms
     double norm = 0.0;
     std::map<std::string, TH2D *> h2_pta_rapidity_lab;
     void init();
+    void fill(const particle &particle, const double &weight);
     void fill(const event &event, const double &weight);
     void normalize();
     void write();
@@ -70,22 +71,42 @@ void histograms::normalize()
     }
 }
 
+void histograms::fill(const particle &particle, const double &weight)
+{
+    if (this->h2_pta_rapidity_lab.count(particle.name) == 1)
+    {
+        this->h2_pta_rapidity_lab[particle.name]->Fill(particle.rapidity_lab / this->beam_rapidity, particle.pt, weight);
+    }
+
+    if (h2_pta_rapidity_lab.count("coal_p") == 1)
+    {
+        this->h2_pta_rapidity_lab["coal_p"]->Fill(particle.rapidity_lab / this->beam_rapidity, particle.pt, weight * particle.zid);
+    }
+    if (h2_pta_rapidity_lab.count("coal_n") == 1)
+    {
+        this->h2_pta_rapidity_lab["coal_n"]->Fill(particle.rapidity_lab / this->beam_rapidity, particle.pt, weight * particle.nid);
+    }
+    return;
+}
+
 void histograms::fill(const event &event, const double &weight)
 {
-    for (auto &par : event.particles)
+    for (const auto &par : event.particles)
     {
-        if (this->h2_pta_rapidity_lab.count(par.name) == 1)
-        {
-            this->h2_pta_rapidity_lab[par.name]->Fill(par.rapidity_lab / this->beam_rapidity, par.pt, weight);
+        this->fill(par, weight);
+        // if (this->h2_pta_rapidity_lab.count(par.name) == 1)
+        // {
+        //     this->h2_pta_rapidity_lab[par.name]->Fill(par.rapidity_lab / this->beam_rapidity, par.pt, weight);
+        // }
 
-            if (h2_pta_rapidity_lab.count("coal_p") == 1)
-            {
-                this->h2_pta_rapidity_lab["coal_p"]->Fill(par.rapidity_lab / this->beam_rapidity, par.pt, weight * par.zid);
-            }
-            if (h2_pta_rapidity_lab.count("coal_n") == 1)
-            {
-                this->h2_pta_rapidity_lab["coal_n"]->Fill(par.rapidity_lab / this->beam_rapidity, par.pt, weight * par.nid);
-            }
-        }
+        // if (h2_pta_rapidity_lab.count("coal_p") == 1)
+        // {
+        //     this->h2_pta_rapidity_lab["coal_p"]->Fill(par.rapidity_lab / this->beam_rapidity, par.pt, weight * par.zid);
+        // }
+        // if (h2_pta_rapidity_lab.count("coal_n") == 1)
+        // {
+        //     this->h2_pta_rapidity_lab["coal_n"]->Fill(par.rapidity_lab / this->beam_rapidity, par.pt, weight * par.nid);
+        // }
     }
+    return;
 }

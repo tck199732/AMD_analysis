@@ -1,7 +1,7 @@
 import subprocess
 import pathlib
 import os
-
+import time
 
 project_dir = pathlib.Path(os.environ['CONDA_PREFIX']).parent
 database = pathlib.Path(project_dir, f'database')
@@ -22,10 +22,12 @@ skyrme = 'SkM'
 
 
 def main():
-    root_inc = subprocess.run('root-config --cflags --libs --glibs', capture_output=True, shell=True, text=True, encoding='utf-8')
+    root_inc = subprocess.run('root-config --cflags --libs --glibs',
+                              capture_output=True, shell=True, text=True, encoding='utf-8')
     root_inc = root_inc.stdout.strip()
 
-    subprocess.run(f'g++ {str(path_main)} -o {str(exe)} -I{root_inc} -I{str(src_dir)}', shell=True, text=True)
+    subprocess.run(
+        f'g++ {str(path_main)} -o {str(exe)} -I{root_inc} -I{str(src_dir)}', shell=True, text=True)
 
     path_data = pathlib.Path(
         input_dir, f'{reaction}E{energy}_{skyrme}_table{mode}.root')
@@ -34,8 +36,13 @@ def main():
     inputs = list(
         map(str, [f'{reaction}E{energy}', mode, path_data, path_out]))
     args = ' '.join(inputs)
-    # print(f'{str(exe)} {args}')
+    print(f'{str(exe)} {args}')
+
+    start_time = time.time()
     subprocess.run(f'{str(exe)} {args}', shell=True, text=True)
+    finish_time = time.time()
+    elapsed_time = finish_time - start_time
+    print(f'time elapsed = {elapsed_time:.2f}')
 
 
 if __name__ == '__main__':

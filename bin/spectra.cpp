@@ -1,7 +1,5 @@
 
 #include "spectra.hh"
-
-#include <thread>
 #include <chrono>
 struct manager
 {
@@ -23,7 +21,7 @@ struct manager
     TFile *outputfile;
 
     int nevents21, nevents3;
-
+    std::chrono::duration<double> timer21, timer3;
     void init();
     void read();
     void replace_error();
@@ -119,8 +117,6 @@ void manager::init()
 
 void manager::read()
 {
-    int ndecays = this->nevents3 / this->nevents21;
-    std::cout << "ndecays : " << ndecays << std::endl;
     int Nc, multi;
     double bimp;
     int *fz;
@@ -129,61 +125,63 @@ void manager::read()
     double *py;
     double *pz;
 
-    for (int ievt21 = 0; ievt21 < nevents21; ievt21++)
+    int ndecays = this->nevents3 / this->nevents21;
+    std::vector<double> weights(this->nevents21, 0.);
+    auto start3 = std::chrono::steady_clock::now();
+    for (int ievt3 = 0; ievt3 < nevents3; ievt3++)
     {
-        double weight = 0.;
-        for (int ndecay = 0; ndecay < ndecays; ndecay++)
+
+        std::map<std::string, std::any> map = this->reader3->get_entry(ievt3);
+        try
         {
-            int ievt3 = ievt21 + ndecay * nevents21;
-            std::map<std::string, std::any> map = this->reader3->get_entry(ievt3);
-            try
-            {
-                Nc = std::any_cast<int>(map["Nc"]);
-                multi = std::any_cast<int>(map["multi"]);
-                bimp = std::any_cast<double>(map["b"]);
-                fn = std::any_cast<int *>(map["N"]);
-                fz = std::any_cast<int *>(map["Z"]);
-                px = std::any_cast<double *>(map["px"]);
-                py = std::any_cast<double *>(map["py"]);
-                pz = std::any_cast<double *>(map["pz"]);
-            }
+            Nc = std::any_cast<int>(map["Nc"]);
+            bimp = std::any_cast<double>(map["b"]);
+            multi = std::any_cast<int>(map["multi"]);
+            fn = std::any_cast<int *>(map["N"]);
+            fz = std::any_cast<int *>(map["Z"]);
+            px = std::any_cast<double *>(map["px"]);
+            py = std::any_cast<double *>(map["py"]);
+            pz = std::any_cast<double *>(map["pz"]);
+        }
 
-            catch (const std::bad_any_cast &e)
-            {
-                std::cout << e.what() << '\n';
-            }
+        catch (const std::bad_any_cast &e)
+        {
+            std::cout << e.what() << '\n';
+        }
+        event event3 = {Nc, bimp};
+        if (!this->event_cut.pass(event3))
+        {
+            continue;
+        }
 
-            event event3 = {Nc, bimp};
-            if (!this->event_cut.pass(event3))
+        weights[ievt3 % 10] += 1.;
+        for (unsigned int i = 0; i < multi; i++)
+        {
+            particle particle = {fn[i], fz[i], px[i], py[i], pz[i]};
+            particle.autofill(this->betacms);
+            if (ievt3 < nevents3 / ndecays)
             {
-                continue;
-            }
-
-            for (unsigned int i = 0; i < multi; i++)
-            {
-                particle particle = {fn[i], fz[i], px[i], py[i], pz[i]};
-                particle.autofill(this->betacms);
-                event3.particles.push_back(particle);
-            }
-
-            weight += 1.;
-            if (ndecay == 0)
-            {
-                this->hist3_ndecay1.fill(event3, 1.);
+                this->hist3_ndecay1.fill(particle, 1.);
                 this->hist3_ndecay1.norm += 1.;
             }
-            this->hist3.fill(event3, 1. / ndecays);
+            this->hist3.fill(particle, 1. / ndecays);
             this->hist3.norm += 1.;
         }
-        this->hist3.norm /= ndecays;
-        weight /= ndecays;
+    }
+    this->hist3.norm /= 1.0 * ndecays;
+    auto end3 = std::chrono::steady_clock::now();
+    this->timer3 = end3 - start3;
 
+    auto start21 = std::chrono::steady_clock::now();
+    for (int ievt21 = 0; ievt21 < nevents21; ievt21++)
+    {
+        weights[ievt21] /= 10.;
         std::map<std::string, std::any> map = this->reader21->get_entry(ievt21);
         try
         {
             Nc = std::any_cast<int>(map["Nc"]);
-            multi = std::any_cast<int>(map["multi"]);
             bimp = std::any_cast<double>(map["b"]);
+            multi = std::any_cast<int>(map["multi"]);
             fn = std::any_cast<int *>(map["N"]);
             fz = std::any_cast<int *>(map["Z"]);
             px = std::any_cast<double *>(map["px"]);
@@ -201,16 +199,18 @@ void manager::read()
         {
             continue;
         }
+
         for (unsigned int i = 0; i < multi; i++)
         {
             particle particle = {fn[i], fz[i], px[i], py[i], pz[i]};
             particle.autofill(this->betacms);
-            event21.particles.push_back(particle);
+            this->hist21.fill(particle, weights[ievt21]);
         }
 
-        this->hist21.fill(event21, weight);
-        this->hist21.norm += weight;
+        this->hist21.norm += weights[ievt21];
     }
+    auto end21 = std::chrono::steady_clock::now();
+    this->timer21 = end21 - start21;
 }
 
 void manager::replace_error()
@@ -231,6 +231,7 @@ void manager::replace_error()
 void manager::finish()
 {
     this->outputfile = new TFile(this->path_out.c_str(), "RECREATE");
+    this->outputfile->cd();
     this->hist21.normalize();
     this->hist3.normalize();
     this->hist3_ndecay1.normalize();
@@ -238,5 +239,7 @@ void manager::finish()
     this->hist3.write();
     this->hist3_ndecay1.write();
     this->outputfile->Write();
+    std::cout << "Elapsed Time reading table3 : " << this->timer3.count() << std::endl;
+    std::cout << "Elapsed Time reading table21 : " << this->timer21.count() << std::endl;
     std::cout << "DONE" << std::endl;
 }

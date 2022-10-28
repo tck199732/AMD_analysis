@@ -1,7 +1,8 @@
 import subprocess
 import pathlib
 import os
-
+import time
+from tracemalloc import start
 
 project_dir = pathlib.Path(os.environ['CONDA_PREFIX']).parent
 database = pathlib.Path(project_dir, f'database')
@@ -42,7 +43,12 @@ def main():
         map(str, [f'{reaction}E{energy}', path_data21, path_data3, path_out, *Nc, *bimp]))
     args = ' '.join(inputs)
     print(f'{str(exe)} {args}')
+
+    start_time = time.time()
     subprocess.run(f'{str(exe)} {args}', shell=True, text=True)
+    finish_time = time.time()
+    elapsed_time = finish_time - start_time
+    print(f'All processes done in {elapsed_time}')
 
 
 if __name__ == '__main__':

@@ -9,11 +9,7 @@ void branch::autofill()
 
         if (size_char == "")
         {
-            size_char = to_string(this->MAX_MULTI);
-        }
-        if (int(size_char) > this->MAX_MULTI)
-        {
-            throw std::invalid_argument("branch array size larger than limit.");
+            throw std::invalid_argument("empty array size is not allowed in leaflist.");
         }
 
         char type_char = toupper(this->type[0]);
