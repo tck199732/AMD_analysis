@@ -18,6 +18,16 @@ struct event
     std::vector<particle> particles; // hira particles
 };
 
+struct vetowall
+{
+    std::map<std::string, std::array<double, 2>> Ekinlabcut;
+    std::map<std::string, std::array<double, 2>> thetalabcut;
+    std::map<std::string, std::array<double, 2>> philabcut;
+    void init();
+    bool pass_ekinlab(const particle &particle);
+    bool pass_angle(const particle &particle);
+};
+
 struct hira
 {
     std::map<std::string, std::array<double, 2>> Ekinlabcut;

@@ -24,7 +24,7 @@ struct manager
 
 int main()
 {
-    int nevents = 10;
+    int nevents = 100;
     manager manager = {nevents, "Ca48Ni64E140", "/data/amd/dec2021/b3fm/filtered/Ca48Ni64E140_SkM_table3.root"};
     manager.init();
     manager.run();
@@ -86,6 +86,10 @@ void manager::run()
         std::map<std::string, std::any> map = this->reader3->get_entry(ievt);
         auto end = std::chrono::steady_clock::now();
         std::chrono::duration<double> elapsed_seconds = end - start;
-        std::cout << ievt3 << "\t" << ievt << "\telapsed time (ascending vs random): " << elapsed_seconds0.count() << "\t" << elapsed_seconds.count() << std::endl;
+
+        if (ievt3 % 10 == 0)
+        {
+            std::cout << ievt3 << "\t" << ievt << "\telapsed time (ascending vs random): " << elapsed_seconds0.count() << "\t" << elapsed_seconds.count() << std::endl;
+        }
     }
 }

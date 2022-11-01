@@ -38,19 +38,19 @@ int main(int argc, char *argv[])
     int Ncmax = 25;
     double bmin = 0.0;
     double bmax = 3.0;
-    if (argc <= 6)
+    if (argc >= 6)
     {
         Ncmin = std::stoi(argv[5]);
     }
-    if (argc <= 7)
+    if (argc >= 7)
     {
         Ncmax = std::stoi(argv[6]);
     }
-    if (argc <= 8)
+    if (argc >= 8)
     {
         bmin = std::stod(argv[7]);
     }
-    if (argc <= 9)
+    if (argc >= 9)
     {
         bmax = std::stod(argv[8]);
     }
@@ -128,7 +128,7 @@ void manager::read()
     int ndecays = this->nevents3 / this->nevents21;
     std::vector<double> weights(this->nevents21, 0.);
     auto start3 = std::chrono::steady_clock::now();
-    for (int ievt3 = 0; ievt3 < nevents3; ievt3++)
+    for (int ievt3 = 0; ievt3 < this->nevents3; ievt3++)
     {
 
         std::map<std::string, std::any> map = this->reader3->get_entry(ievt3);
@@ -154,7 +154,8 @@ void manager::read()
             continue;
         }
 
-        weights[ievt3 % 10] += 1.;
+        weights[ievt3 % nevents21] += 1.;
+
         for (unsigned int i = 0; i < multi; i++)
         {
             particle particle = {fn[i], fz[i], px[i], py[i], pz[i]};
@@ -165,17 +166,16 @@ void manager::read()
                 this->hist3_ndecay1.norm += 1.;
             }
             this->hist3.fill(particle, 1. / ndecays);
-            this->hist3.norm += 1.;
+            this->hist3.norm += 1. / ndecays;
         }
     }
-    this->hist3.norm /= 1.0 * ndecays;
     auto end3 = std::chrono::steady_clock::now();
     this->timer3 = end3 - start3;
 
     auto start21 = std::chrono::steady_clock::now();
     for (int ievt21 = 0; ievt21 < nevents21; ievt21++)
     {
-        weights[ievt21] /= 10.;
+        weights[ievt21] /= 1.0 * ndecays;
         std::map<std::string, std::any> map = this->reader21->get_entry(ievt21);
         try
         {
@@ -195,10 +195,10 @@ void manager::read()
         }
 
         event event21 = {Nc, bimp};
-        if (!this->event_cut.pass(event21))
-        {
-            continue;
-        }
+        // if (!this->event_cut.pass(event21))
+        // {
+        //     continue;
+        // }
 
         for (unsigned int i = 0; i < multi; i++)
         {
