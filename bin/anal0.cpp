@@ -9,8 +9,8 @@ struct manager
 
     std::vector<fs::path> data_paths21;
     std::vector<fs::path> data_paths3;
-    std::map<fs::path, RootReader *> reader21;
-    std::map<fs::path, RootReader *> reader3;
+    std::map<std::string, RootReader *> reader21;
+    std::map<std::string, RootReader *> reader3;
 
     system_info *sys_info;
     double betacms, rapidity_beam;

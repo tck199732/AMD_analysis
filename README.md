@@ -9,6 +9,7 @@ This repository contains codes for analyzing the output of the 'Antisymmetrized 
 2. [Structure of the repository](#2-structure-of-the-repository)
 3. [Procedures](#3-procedures)
 4. [Notes on analysis](#4-notes-on-analysis)
+5. [Other Executable](#4-other-executables)
 
 ## 1. Installation
 ```bash
@@ -53,3 +54,6 @@ where data_dir refers to directory of the data in root format, path_list refers 
     -  Although the bin content would be more accurate, the error calculation would not be correct as these 10 decays are not entirely independent. Hence, one should fill an extra histogram in ROOT which accounts for only 1 seqential decay for each primary events. Such calculation of the error would be a good approximation for the final histogram.
 
     - Table21 and Table3 would be read simultaneous for analysis with experimental filter. For each primary event, 10 events with seqential decay will be firstly analyzed with weight = 1 / 10.  Among these 10 events, n of them will pass the experimental filter. The weight in primary event will be n / 10. In this way, we can compare the primary spectra corresponding to the "seqeutial spectra".
+
+## 5. Other Executables
+- anal0.cpp : Reads data file by file instead of chaining together, counts multiplicity for each atomic number, contribution from primary fragment and secondary decay in table3.root

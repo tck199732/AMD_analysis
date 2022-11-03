@@ -84,18 +84,17 @@ void histograms::fill(const event &event)
 
     for (auto &par : event.particles)
     {
-        int zid = par.aid - par.nid;
-        if (zid == 1)
+        if (par.zid == 1)
         {
             this->h1_multi_H->Fill(par.aid, this->weight);
         }
-        if (zid == 2)
+        if (par.zid == 2)
         {
             this->h1_multi_He->Fill(par.aid, this->weight);
         }
         if (this->mode == "21")
         {
-            this->h1_Z_prim->Fill(zid, this->weight);
+            this->h1_Z_prim->Fill(par.zid, this->weight);
         }
     }
 
@@ -124,11 +123,11 @@ void histograms::fill(const event &event21, const event &event3)
         }
         if (isPrim)
         {
-            this->h1_Z_prim->Fill(par3.aid - par3.nid, this->weight);
+            this->h1_Z_prim->Fill(par3.zid, this->weight);
         }
         else
         {
-            this->h1_Z_seq->Fill(par3.aid - par3.nid, this->weight);
+            this->h1_Z_seq->Fill(par3.zid, this->weight);
         }
     }
 }
