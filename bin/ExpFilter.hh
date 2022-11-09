@@ -28,6 +28,10 @@ struct vetowall
     bool pass_angle(const particle &particle);
 };
 
+struct lana
+{
+};
+
 struct hira
 {
     std::map<std::string, std::array<double, 2>> Ekinlabcut;

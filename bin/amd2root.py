@@ -11,11 +11,16 @@ database = pathlib.Path(project_dir, 'database')
 
 dat_dir = pathlib.Path('/data/amd/dec2021/b3fm')
 root_dir = pathlib.Path('/data/amd/dec2021/b3fm')
+list_dir = pathlib.Path(database, 'inputlist/dec2021')
+
 # dat_dir = pathlib.Path('/data/amd/feb2022/b10fm')
 # root_dir = pathlib.Path('/data/amd/feb2022/b10fm')
-
-list_dir = pathlib.Path(database, 'inputlist/dec2021')
 # list_dir = pathlib.Path(database, 'inputlist/feb2022')
+
+dat_dir = pathlib.Path('/data/amd/nov2022/sigma100')
+root_dir = pathlib.Path('/data/amd/nov2022/sigma100')
+list_dir = pathlib.Path(database, 'inputlist/nov2022')
+
 
 ##########################################################################
 nuclei = ['Ca40Ni58', 'Ca48Ni64', 'Ca40Sn112', 'Ca48Sn124']
@@ -30,29 +35,35 @@ path_list = {rec: pathlib.Path(list_dir, f'{name}.list')
              for rec, name in zip(reaction, rec_name)}
 
 def main():
-    while not exe.exists():
-        try:
-            os.chdir(f'{str(project_dir)}/bin')
-            root_libs = subprocess.run('root-config --libs --glibs --cflags',
-                                       shell=True, capture_output=True, text=True, encoding='utf-8')
-            subprocess.run(
-                f'g++ amd2root.cpp -o amd2root -I{root_libs.stdout.strip()}', shell=True)
-        except:
-            current_env = ''
-            conda_envs = subprocess.run(
-                'conda env list', capture_output=True, shell=True, text=True)
-            envs = conda_envs.stdout.strip().split('\n')[2:]
-            for env in envs:
-                if '*' in env:
-                    current_env = envs[0].split()[-1]
+    os.chdir(f'{str(project_dir)}/bin')
+    root_libs = subprocess.run('root-config --libs --glibs --cflags',
+                                    shell=True, capture_output=True, text=True, encoding='utf-8')
+    subprocess.run(f'g++ amd2root.cpp -o amd2root -I{root_libs.stdout.strip()}', shell=True)
 
-            if not current_env == f'{str(project_dir)}/env':
-                os.chdir(str(project_dir))
-                subprocess.run(f'conda activate ./env', shell=True)
 
-    run(mode='21')
-    # run(mode='21t')
-    run(mode='3')
+    # while not exe.exists():
+    #     try:
+    #         os.chdir(f'{str(project_dir)}/bin')
+    #         root_libs = subprocess.run('root-config --libs --glibs --cflags',
+    #                                    shell=True, capture_output=True, text=True, encoding='utf-8')
+    #         subprocess.run(
+    #             f'g++ amd2root.cpp -o amd2root -I{root_libs.stdout.strip()}', shell=True)
+    #     except:
+    #         current_env = ''
+    #         conda_envs = subprocess.run(
+    #             'conda env list', capture_output=True, shell=True, text=True)
+    #         envs = conda_envs.stdout.strip().split('\n')[2:]
+    #         for env in envs:
+    #             if '*' in env:
+    #                 current_env = envs[0].split()[-1]
+
+    #         if not current_env == f'{str(project_dir)}/env':
+    #             os.chdir(str(project_dir))
+    #             subprocess.run(f'conda activate ./env', shell=True)
+
+    # run(mode='21')
+    run(mode='21t')
+    # run(mode='3')
     print('All DONE')
 
 
@@ -79,14 +90,14 @@ def run(mode):
             # print(list(map(str, path_coll_hist)))
             # print(list(map(str, path_amdgid)))
 
-        for dat, out, ch, gid in zip(path_data, path_out, path_coll_hist, path_amdgid):
-            if out.exists():
-                continue
+        for dat, out, ch, gid in zip(path_data, path_out, path_amdgid, path_coll_hist):
+            # if out.exists():
+            #     continue
 
             inputs = [rec[0], mode, dat, out]
             inputs = list(map(str, inputs))
             if mode == '21t':
-                inputs.extend([ch, gid])
+                inputs.extend(list(map(str,[ch, gid])))
             args = ' '.join(inputs)
             print(args)
             subprocess.run(f'{str(exe)} {args}', shell=True, text=True)

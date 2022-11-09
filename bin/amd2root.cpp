@@ -184,6 +184,7 @@ void manager::compile21()
 
 void manager::compile21t()
 {
+    int event_processed = 0;
     std::cout << "loading table21 : " << fs::absolute(this->path_data) << std::endl;
     std::ifstream file_table21(fs::absolute(this->path_data));
 
@@ -202,11 +203,13 @@ void manager::compile21t()
     std::map<int, std::vector<std::pair<int, std::vector<double>>>> coll_hist;
 
     int prim_pid, nuc, gid, N, Z, ievt;
+
     while (!file_amdgid.eof())
     {
         for (int _ = 1; _ <= this->amass; _++)
         {
             file_amdgid >> prim_pid >> nuc >> gid >> N >> Z >> ievt;
+            // std::cout << prim_pid << "\t" << nuc << "\t" << gid << "\t" << N << "\t" << Z << "\t" << ievt << std::endl;
             if (gidmap.count(prim_pid) == 0)
             {
                 gidmap[prim_pid] = std::vector<int>(1, gid);
@@ -216,6 +219,7 @@ void manager::compile21t()
                 gidmap[prim_pid].push_back(gid);
             }
         }
+
         // std::cout << gidmap.size() << std::endl;
         int current_evt = ievt;
         while (!file_coll_hist.eof())
@@ -284,7 +288,6 @@ void manager::compile21t()
                 event = {ievt, bimp, particles};
                 // event.report();
                 this->fill(event);
-
                 particles.clear();
 
                 gidmap.clear();
@@ -292,6 +295,12 @@ void manager::compile21t()
                 coll_hist[gid].push_back(pair);
                 break;
             }
+        }
+
+        event_processed++;
+        if (event_processed % 1000 == 0)
+        {
+            std::cout << event_processed << std::endl;
         }
     }
 }
