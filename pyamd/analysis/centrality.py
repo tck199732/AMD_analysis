@@ -13,7 +13,7 @@ from pyamd.utilities import root6, helper, minuit
 from pyamd.e15190 import e15190
 
 hist_reader = root6.HistogramReader()
-helper = helper.helper()
+df_helper = helper.DataFrameHelper()
 
 
 class MultiplicityFile:
@@ -159,7 +159,7 @@ class Multiplicity_ImpactParameter:
         df = self.MultiplicitySpectra(range=range, bins=bins, cut=cut)
         kw = dict(fmt='.')
         kw.update(kwargs)
-        return helper.plot1d(ax, df, **kw)
+        return df_helper.plot1d(ax, df, **kw)
 
     def plot_impact_parameter(self, ax=None, range=(0., 10.), cut=(-0.5, 24.5), bins=20, **kwargs):
         df = self.ImpactParameterSpectra(range=range, bins=bins, cut=cut)
@@ -167,7 +167,7 @@ class Multiplicity_ImpactParameter:
             fmt='.',
         )
         kw.update(kwargs)
-        return helper.plot1d(ax, df, **kw)
+        return df_helper.plot1d(ax, df, **kw)
 
     def model_dsigma_db(self, x, norm, b0, db):
         return norm * x / (1 + np.exp((x-b0)/db))
@@ -211,7 +211,7 @@ class Multiplicity_ImpactParameter:
         df['y_err'] = df['y_err'] * unit
         kw = dict(fmt='--')
         kw.update(kwargs)
-        return helper.plot1d(ax, df, **kw)
+        return df_helper.plot1d(ax, df, **kw)
 
     def plot_dsigma_db(self, ax=None, df=None, range=(0., 10.), bins=20, unit=1., **kwargs):
         if df is None:
@@ -219,7 +219,7 @@ class Multiplicity_ImpactParameter:
                 range=range, bins=bins, unit=unit)
         kw = dict(fmt='.',)
         kw.update(kwargs)
-        return helper.plot1d(ax, df, **kw)
+        return df_helper.plot1d(ax, df, **kw)
 
     def plot2d(self, ax=None, df=None, cmap='jet', drop_zeros=True, **kwargs):
         if df is None:
@@ -279,7 +279,7 @@ class Multiplicity_ImpactParameter:
             'y_ferr': 0.
             # 'y_ferr': np.divide(yerr, y, where=(y != 0.0), out=np.zeros_like(yerr))
         })
-        return helper.plot1d(ax, df, **kw)
+        return df_helper.plot1d(ax, df, **kw)
 
     def plot_fitted_multiplicity(self, ax=None, df=None, cut=(0., 10.), range=(-0.5, 24.5), bins=25, **kwargs):
 
@@ -302,7 +302,7 @@ class Multiplicity_ImpactParameter:
 
         kw = dict(fmt='ko')
         kw.update(kwargs)
-        return helper.plot1d(ax, df, **kw)
+        return df_helper.plot1d(ax, df, **kw)
 
     def output(self, df, path, **kwargs):
         kw = dict(

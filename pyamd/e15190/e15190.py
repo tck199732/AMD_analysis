@@ -3,25 +3,24 @@ import re
 import numpy as np
 
 
-class particle:
-    PARTICLES = ['n', 'p', 'd', 't', '3He', '4He']
-    ZID = [0, 1, 1, 1, 2, 2]
-    NID = [1, 0, 1, 2, 1, 2]
+# class particle:
+#     PARTICLES = ['n', 'p', 'd', 't', '3He', '4He']
+#     ZID = [0, 1, 1, 1, 2, 2]
+#     NID = [1, 0, 1, 2, 1, 2]
 
-    def __init__(self, name):
-        if name == 'coal_p':
-            name = 'p'
-        elif name == 'coal_n':
-            name = 'n'
-        elif not name in self.PARTICLES:
-            raise ValueError('input particle is not analyzed in experiment.')
-        self.name = name
-        self.Z = self.ZID[self.PARTICLES.index(name)]
-        self.N = self.NID[self.PARTICLES.index(name)]
+#     def __init__(self, name):
+#         if name == 'coal_p':
+#             name = 'p'
+#         elif name == 'coal_n':
+#             name = 'n'
+#         elif not name in self.PARTICLES:
+#             raise ValueError('input particle is not analyzed in experiment.')
+#         self.name = name
+#         self.Z = self.ZID[self.PARTICLES.index(name)]
+#         self.N = self.NID[self.PARTICLES.index(name)]
 
 
 class reaction:
-
     mass_1u = 931.49410242
     beam_mass = {
         'Ca40': 39.962590866,

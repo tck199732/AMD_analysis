@@ -12,7 +12,7 @@ import random
 from datetime import datetime
 random.seed(datetime.now().timestamp())
 
-helper = helper.helper()
+plot_helper = helper.DataFrameHelper()
 hist_reader = root6.HistogramReader()
 
 
@@ -35,10 +35,10 @@ class SpectraFile:
         if name is None:
             names = self.get_names(particle)
             names = [name for name in names if keyword.lower() in name.lower()]
-            print(names)
             if len(names) == 0:
                 raise ValueError('No objects is returned.')
             name = min(names, key=len)
+            print(f'reading : {name}')
 
         with root6.TFile(self.path) as file:
             hist = file.Get(name)
@@ -65,13 +65,12 @@ class PtRapidityLAB:
 
     DIR = f'{str(PROJECT_DIR)}/result/spectra'
 
-    def __init__(self, particle, df=None, path=None, reaction='Ca48Ni64E140', skyrme='SkM', impact_parameter=(0., 3.), uball_multiplicity=(1, 25), mode='seq', fullname=None):
+    def __init__(self, particle, df=None, path=None, reaction='Ca48Ni64E140', skyrme='SkM', impact_parameter=(0., 3.), uball_multiplicity=(1, 25), mode='seq', histname=None):
 
         self.betacms = e15190.reaction(reaction).get_betacms()
         self.beam_rapidity = e15190.reaction(reaction).get_rapidity_beam()
 
         self.reaction = reaction
-        self.particle = e15190.particle(particle)
 
         if df is None:
             if path is None:
@@ -79,12 +78,12 @@ class PtRapidityLAB:
 
             spectra_file = SpectraFile(path)
 
-            if fullname is None:
-                # fullname in AMD result
-                fullname = f'h2_pta_rapidity_lab_{mode}_{particle}'
+            if histname is None:
+                # histname in AMD result
+                histname = f'h2_pta_rapidity_lab_{mode}_{particle}'
 
             df = spectra_file.get_histogram(
-                particle=particle, keyword=fullname)
+                particle=particle, keyword=histname)
             df = hist_reader.hist2d_to_df(df, keep_zeros=False)
 
         if not 'z_ferr' in df.columns:
@@ -184,16 +183,16 @@ class PtRapidityLAB:
 
     def plotPtRapidity(self, ax=None, range=[[0., 1.], [0., 600.]], bins=[100, 600], **kwargs):
         df = self.df.copy()
-        return helper.plot2d(ax, df, range=range, bins=bins, **kwargs)
+        return plot_helper.plot2d(ax, df, range=range, bins=bins, **kwargs)
 
     def plotPtSpectrum(self, ax=None, xrange=(0.4, 0.6), yrange=(0, 600), bins=30, correct_coverage=False, correct_range=(0., 600), **kwargs):
         df = self.PtSpectrum(xrange=xrange, yrange=yrange,
                              bins=bins, correct_coverage=correct_coverage, correct_range=correct_range)
-        return helper.plot1d(ax, df, **kwargs)
+        return plot_helper.plot1d(ax, df, **kwargs)
 
     def plotRapidityCMS(self, ax=None, range=(-0.5, 0.5), bins=100, **kwargs):
         df = self.RapidityCMS(range=range, bins=bins)
-        return helper.plot1d(ax, df, **kwargs)
+        return plot_helper.plot1d(ax, df, **kwargs)
 
     def EkinThetaCMS(self, xrange=(0.4, 0.6), yrange=(0., 600.), correct_coverage=False):
         df = self.correct_coverage(xrange=xrange, yrange=yrange) if correct_coverage else self.query(
@@ -226,7 +225,6 @@ class PtRapidityLAB:
 
 class EkinThetaCMS:
     def __init__(self, particle, df=None, reaction=None, path=None, skyrme='SkM', impact_parameter=(0., 3.), uball_multiplicity=(1, 25), mode='all'):
-        self.particle = e15190.particle(particle)
 
         if df is None:
             df = PtRapidityLAB(
@@ -288,15 +286,15 @@ class EkinThetaCMS:
 
     def plotEkinCMS(self, ax=None, range=(0, 200), bins=50, **kwargs):
         df = self.EkinCMS(xrange=range, bins=bins)
-        return helper.plot1d(ax, df, **kwargs)
+        return plot_helper.plot1d(ax, df, **kwargs)
 
     def plotThetaCMS(self, ax=None, range=(40, 140), bins=100, **kwargs):
         df = self.ThetaCMS(yrange=range, bins=bins)
-        return helper.plot1d(ax, df, **kwargs)
+        return plot_helper.plot1d(ax, df, **kwargs)
 
     def plotEkinThetaCMS(self, ax=None, range=[[0, 200], [40, 140]], bins=[50, 100], **kwargs):
         df = self.query(xrange=range[0], yrange=range[1])
-        return helper.plot2d(ax, df, range=range, bins=bins, **kwargs)
+        return plot_helper.plot2d(ax, df, range=range, bins=bins, **kwargs)
 
 
 if __name__ == '__main__':

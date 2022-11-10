@@ -1,17 +1,14 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import pathlib
-import os
 from copy import copy
-from pyamd.utilities import root6
 
 
-class helper:
+class DataFrameHelper:
     def __init__(self):
         pass
-    # df2 / df1
 
+    # df2 / df1
     def ratio1d(self, df1, df2):
         df1 = df1.copy()
         df2 = df2.copy()
@@ -76,32 +73,3 @@ class helper:
             'y_err': histerr,
             'y_ferr': np.divide(histerr, hist, where=(hist != 0.0), out=np.zeros_like(histerr))
         })
-
-
-class reader:
-    def __init__(self, path):
-        self.path = pathlib.Path(__file__).parent
-        self.path = pathlib.Path(self.path, path).resolve()
-
-    def get_names(self, keyword='None'):
-        if not self.path.exists():
-            raise OSError(f'file not found : {str(self.path)}')
-
-        if self.path.is_file() and os.access(self.path, os.R_OK):
-            with root6.TFile(str(self.path)) as file:
-                if keyword is None:
-                    return [key.GetName() for key in file.GetListOfKeys()]
-                else:
-                    return [key.GetName() for key in file.GetListOfKeys() if keyword in key.GetName()]
-
-    def get_histogram(self, name=None, keyword=None):
-        if name is None:
-            names = self.get_names(keyword)
-            if len(names) == 0:
-                raise ValueError('No objects is returned.')
-            name = min(names, key=len)
-
-        with root6.TFile(self.path) as file:
-            hist = file.Get(name)
-            hist.SetDirectory(0)  # will not be deleted when file is closed
-            return hist

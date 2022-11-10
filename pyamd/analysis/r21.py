@@ -1,13 +1,12 @@
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 from pyamd.utilities import helper
-helper = helper.helper()
+df_helper = helper.DataFrameHelper()
 class R21:
     def __init__(self, particle, df_R21 = None, df_prich=None, df_nrich=None):
         self.particle = particle
         if df_R21 is None:
-            df_R21 = helper.ratio1d(df_prich, df_nrich)
+            df_R21 = df_helper.ratio1d(df_prich, df_nrich)
         self.df = df_R21
 
     def plotR21(self, ax=None, range=(0,600), bins=30, **kwargs):
@@ -23,7 +22,7 @@ class R21:
             'y_err': histerr,
             'y_ferr' : np.divide(histerr, hist, where=(hist!=0.0), out=np.zeros_like(histerr))
         })
-        return helper.plot1d(ax, df, drop_zeros=True, drop_large_err=True, rel_err=0.05, **kwargs)
+        return df_helper.plot1d(ax, df, drop_zeros=True, drop_large_err=True, rel_err=0.05, **kwargs)
     
     def AveargeR21(self, range=(0., 600.)):
         df = self.df.copy()
@@ -68,6 +67,6 @@ class R21:
 
     def plotAverageR21Trend(self, ax=None, range=(0., 600.), **kwargs):
         df = self.AverageR21Trend(range=range)
-        return helper.plot1d(ax, df, **kwargs)
+        return df_helper.plot1d(ax, df, **kwargs)
 
     

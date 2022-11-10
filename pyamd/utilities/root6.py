@@ -80,16 +80,16 @@ class HistogramReader:
         )
         return df if keep_zeros else df.query(f'{zname} != 0.0').reset_index(drop=True)
 
-    def graph_to_df(self, grer, xname='x', yname='y', keep_zeros=True):
-        df = dict()
-        columns = [xname, yname, f'{yname}_err']
-        getters = [grer.GetX, grer.GetY, grer.GetEY]
-        for col, get in zip(columns, getters):
-            df[col] = [get()[b] for b in range(grer.GetN())]
+    # def graph_to_df(self, grer, xname='x', yname='y', keep_zeros=True):
+    #     df = dict()
+    #     columns = [xname, yname, f'{yname}_err']
+    #     getters = [grer.GetX, grer.GetY, grer.GetEY]
+    #     for col, get in zip(columns, getters):
+    #         df[col] = [get()[b] for b in range(grer.GetN())]
 
-        df = pd.DataFrame(df)
-        condition = (df[yname] != 0.0)
-        df[f'{yname}_ferr'] = np.where(
-            condition, np.abs(df[f'{yname}_err']/df[yname]), 0.0)
+    #     df = pd.DataFrame(df)
+    #     condition = (df[yname] != 0.0)
+    #     df[f'{yname}_ferr'] = np.where(
+    #         condition, np.abs(df[f'{yname}_err']/df[yname]), 0.0)
 
-        return df if keep_zeros else df.query(f'{zname} != 0.0').reset_index(drop=True)
+    #     return df if keep_zeros else df.query(f'{zname} != 0.0').reset_index(drop=True)
