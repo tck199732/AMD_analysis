@@ -56,4 +56,4 @@ where data_dir refers to directory of the data in root format, path_list refers 
     - Table21 and Table3 would be read simultaneous for analysis with experimental filter. For each primary event, 10 events with seqential decay will be firstly analyzed with weight = 1 / 10.  Among these 10 events, n of them will pass the experimental filter. The weight in primary event will be n / 10. In this way, we can compare the primary spectra corresponding to the "seqeutial spectra".
 
 ## 5. Other Executables
-- anal0.cpp : Reads data file by file instead of chaining together, counts multiplicity for each atomic number, contribution from primary fragment and secondary decay in table3.root
+- anal0.cpp : Reads data file by file instead of chaining together, counts multiplicity for each atomic number, contribution from primary fragment and secondary decay in table3.root. No experimental cut is applied.

@@ -9,18 +9,21 @@ import glob
 project_dir = pathlib.Path(os.environ['CONDA_PREFIX']).parent
 database = pathlib.Path(project_dir, 'database')
 
-dat_dir = pathlib.Path('/data/amd/dec2021/b3fm')
-root_dir = pathlib.Path('/data/amd/dec2021/b3fm')
-list_dir = pathlib.Path(database, 'inputlist/dec2021')
+# dat_dir = pathlib.Path('/data/amd/dec2021/b3fm')
+# root_dir = pathlib.Path('/data/amd/dec2021/b3fm')
+# list_dir = pathlib.Path(database, 'inputlist/dec2021')
 
 # dat_dir = pathlib.Path('/data/amd/feb2022/b10fm')
 # root_dir = pathlib.Path('/data/amd/feb2022/b10fm')
 # list_dir = pathlib.Path(database, 'inputlist/feb2022')
 
-dat_dir = pathlib.Path('/data/amd/nov2022/sigma100')
-root_dir = pathlib.Path('/data/amd/nov2022/sigma100')
-list_dir = pathlib.Path(database, 'inputlist/nov2022')
+# dat_dir = pathlib.Path('/data/amd/nov2022/sigma100')
+# root_dir = pathlib.Path('/data/amd/nov2022/sigma100')
+# list_dir = pathlib.Path(database, 'inputlist/nov2022/sigma100')
 
+dat_dir = pathlib.Path('/data/amd/nov2022/sigma_free')
+root_dir = pathlib.Path('/data/amd/nov2022/sigma_free')
+list_dir = pathlib.Path(database, 'inputlist/nov2022/sigma_free')
 
 ##########################################################################
 nuclei = ['Ca40Ni58', 'Ca48Ni64', 'Ca40Sn112', 'Ca48Sn124']
@@ -61,9 +64,10 @@ def main():
     #             os.chdir(str(project_dir))
     #             subprocess.run(f'conda activate ./env', shell=True)
 
-    # run(mode='21')
+
+    run(mode='21')
     run(mode='21t')
-    # run(mode='3')
+    run(mode='3')
     print('All DONE')
 
 
@@ -91,8 +95,8 @@ def run(mode):
             # print(list(map(str, path_amdgid)))
 
         for dat, out, ch, gid in zip(path_data, path_out, path_amdgid, path_coll_hist):
-            # if out.exists():
-            #     continue
+            if out.exists():
+                continue
 
             inputs = [rec[0], mode, dat, out]
             inputs = list(map(str, inputs))

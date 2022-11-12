@@ -11,12 +11,19 @@ src_dir = pathlib.Path(project_dir, 'src')
 exe_name = pathlib.Path(__file__).stem
 path_main = pathlib.Path(exe_dir, f'{str(exe_name)}.cpp')
 
-input_dir = pathlib.Path('/data/amd/dec2021/b3fm/filtered')
-out_dir = pathlib.Path(project_dir, f'result/{str(exe_name)}/b3fm')
+# input_dir = pathlib.Path('/data/amd/dec2021/b3fm/filtered')
+# out_dir = pathlib.Path(project_dir, f'result/{str(exe_name)}/sigma0.85_b3fm')
+
+# input_dir = pathlib.Path('/data/amd/nov2022/sigma100/filtered')
+# out_dir = pathlib.Path(project_dir, f'result/{str(exe_name)}/sigma100_b3fm')
+
+input_dir = pathlib.Path('/data/amd/nov2022/sigma_free/filtered')
+out_dir = pathlib.Path(project_dir, f'result/{str(exe_name)}/sigma_free_b3fm')
+
 out_dir.mkdir(exist_ok=True, parents=True)
 
-reaction = 'Ca48Ni64'
-energy = 140
+reaction = 'Ca40Ni58'
+energy = 56
 skyrme = 'SkM'
 mode = "3"
 Nc = (11, 25)
