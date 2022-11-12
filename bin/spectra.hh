@@ -65,6 +65,7 @@ void histograms::write()
 
 void histograms::normalize()
 {
+    std::cout << "normalizing histograms : " << this->norm << std::endl;
     for (const auto &pn : this->particlenames)
     {
         this->h2_pta_rapidity_lab[pn]->Scale(1. / this->norm);

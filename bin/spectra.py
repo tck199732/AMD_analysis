@@ -11,10 +11,11 @@ exe_dir = pathlib.Path(project_dir, 'bin')
 src_dir = pathlib.Path(project_dir, 'src')
 path_main = pathlib.Path(exe_dir, 'spectra.cpp')
 
-input_dir = pathlib.Path('/data/amd/dec2021/b3fm/filtered')
-out_dir = pathlib.Path(project_dir, 'result/spectra')
-# input_dir = pathlib.Path('/data/amd/nov2022/sigma100/filtered')
-# out_dir = pathlib.Path(project_dir, 'result/spectra/sigma100')
+# input_dir = pathlib.Path('/data/amd/dec2021/b3fm/filtered')
+# out_dir = pathlib.Path(project_dir, 'result/spectra/sigma0.85_b3fm')
+
+input_dir = pathlib.Path('/data/amd/nov2022/sigma100/filtered')
+out_dir = pathlib.Path(project_dir, 'result/spectra/sigma100_b3fm')
 out_dir.mkdir(exist_ok=True)
 
 # reaction = 'Ca48Ni64'
@@ -45,7 +46,7 @@ def main():
         input_dir, f'{reaction}E{energy}_{skyrme}_table3.root')
 
     path_out = pathlib.Path(
-        out_dir, f'{reaction}E{energy}_{skyrme}_Ncmin{Nc[0]}_Ncmax{Nc[1]}_b{bimp[1]:.0f}fm.root')
+        out_dir, f'{reaction}E{energy}_{skyrme}_Ncmin{Nc[0]}_Ncmax{Nc[1]}.root')
 
     inputs = list(
         map(str, [f'{reaction}E{energy}', path_data21, path_data3, path_out, *Nc, *bimp]))

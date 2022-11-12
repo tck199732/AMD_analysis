@@ -149,11 +149,18 @@ void manager::read()
             std::cout << e.what() << '\n';
         }
         event event3 = {Nc, bimp};
-        if (!this->event_cut.pass(event3))
+        if (this->event_cut.pass(event3))
+        {
+            this->hist3.norm += 1. / ndecays;
+            if (ievt3 < nevents3 / ndecays)
+            {
+                this->hist3_ndecay1.norm += 1.;
+            }
+        }
+        else
         {
             continue;
         }
-
         weights[ievt3 % nevents21] += 1.;
 
         for (unsigned int i = 0; i < multi; i++)
@@ -163,10 +170,8 @@ void manager::read()
             if (ievt3 < nevents3 / ndecays)
             {
                 this->hist3_ndecay1.fill(particle, 1.);
-                this->hist3_ndecay1.norm += 1.;
             }
             this->hist3.fill(particle, 1. / ndecays);
-            this->hist3.norm += 1. / ndecays;
         }
     }
     auto end3 = std::chrono::steady_clock::now();
