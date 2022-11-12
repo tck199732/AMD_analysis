@@ -3,13 +3,9 @@ import os
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.colors import LogNorm
-import subprocess
 from copy import copy
-
-from pyamd.utilities import root6, physics, style
-from pyamd.e15190 import e15190
-
+from pyamd import PROJECT_DIR
+from pyamd.utilities import root6
 hist_reader = root6.HistogramReader()
 
 
@@ -40,7 +36,7 @@ class EmissionTimeFile:
 
 
 class EmissionTime:
-    DIR = '{str(PROJECT_DIR)}/result/emission_time'
+    DIR = f'{str(PROJECT_DIR)}/result/emission_time'
 
     def __init__(self, particle, path=None, reaction='Ca48Ni64E140', skyrme='SkM', impact_parameter=(0., 3.)):
         self.particle = particle
@@ -48,7 +44,7 @@ class EmissionTime:
             path = f'{self.DIR}/{reaction}_{skyrme}_bmin{impact_parameter[0]:.1f}_bmax{impact_parameter[1]:.1f}.root'
 
         spectrafile = EmissionTimeFile(path)
-        self.df = spectrafile.get_histogram(keyword=f'h2_pt_time_{particle}')
+        self.df = spectrafile.get_histogram(keyword=f'h2_time_momentum_{particle}')
         self.profile = self.df.ProfileX(name='profile', firstybin=1, lastybin=-1)
         self.profile = hist_reader.hist1d_to_df(self.profile)
         self.df = hist_reader.hist2d_to_df(self.df)
@@ -143,18 +139,3 @@ class EmissionTime:
 
         ax.errorbar(df.x, df.y, yerr=df['y_err'], **kw)
         return ax
-
-
-if __name__ == '__main__':
-    spectra = EmissionTime('p')
-    # print(spectra.AverageEmissionTime())
-
-    # fig, ax = plt.subplots()
-    # spectra.plot2d(ax, norm=LogNorm())
-    # fig.savefig('emissiontime.png')
-
-    fig, ax = plt.subplots()
-    spectra.plot1d(ax=ax)
-
-    fig.savefig('average_emissiontime.png')
-    
