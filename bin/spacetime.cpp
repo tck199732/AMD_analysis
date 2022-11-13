@@ -76,6 +76,8 @@ void manager::init()
 
 void manager::read()
 {
+    double count_neg_time = 0.;
+
     int multi;
     double bimp;
     int *fz;
@@ -116,11 +118,18 @@ void manager::read()
             particle particle = {fn[i], fz[i], px[i], py[i], pz[i]};
             particle.set_xyzt(x[i], y[i], z[i], t[i]);
             particle.autofill(this->betacms);
+
+            if (particle.t <= 0.0)
+            {
+                count_neg_time += 1.;
+                std::cout << particle.t << std::endl;
+            }
             this->hist.fill(particle, 1.);
         }
 
         this->hist.norm += 1.;
     }
+    std::cout << count_neg_time << std::endl;
 }
 
 void manager::finish()

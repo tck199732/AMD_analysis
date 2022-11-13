@@ -249,6 +249,7 @@ void manager::compile21t()
                 for (unsigned int j = 1; j <= gidmap.size(); j++)
                 {
                     std::vector<double> spacetime(4, 0.);
+                    spacetime[0] = -1.;
                     for (const auto &id : gidmap[j])
                     {
                         std::vector<double> last_interaction(7, 0.); // for each nucleon in a prim. particle
