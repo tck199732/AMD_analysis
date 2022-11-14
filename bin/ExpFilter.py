@@ -21,10 +21,13 @@ src_dir = pathlib.Path(project_dir, 'src')
 # input_dir = pathlib.Path('/data/amd/nov2022/sigma100')
 # out_dir = pathlib.Path('/data/amd/nov2022/sigma100/filtered')
 
-list_dir = pathlib.Path(database, 'inputlist/nov2022/sigma_free')
-input_dir = pathlib.Path('/data/amd/nov2022/sigma_free')
-out_dir = pathlib.Path('/data/amd/nov2022/sigma_free/filtered')
+# list_dir = pathlib.Path(database, 'inputlist/nov2022/sigma_free')
+# input_dir = pathlib.Path('/data/amd/nov2022/sigma_free')
+# out_dir = pathlib.Path('/data/amd/nov2022/sigma_free/filtered')
 
+list_dir = pathlib.Path(database, 'inputlist/nov2022/sigma10.05')
+input_dir = pathlib.Path('/data/amd/nov2022/sigma10.05')
+out_dir = pathlib.Path('/data/amd/nov2022/sigma10.05/filtered')
 
 # print(out_dir)
 out_dir.mkdir(exist_ok=True)
@@ -51,6 +54,8 @@ def main():
         for mode in ['21', '3']:
             path_out = pathlib.Path(
                 out_dir, f'{rec[0]}_{rec[1]}_table{mode}.root')
+            if path_out.exists():
+                continue
             inputs = list(map(str, [rec[0], mode, input_dir, rlist, path_out]))
             args = ' '.join(inputs)
             print(f'{str(exe)} {args}')

@@ -149,7 +149,7 @@ class PtRapidityLAB:
         histerr = np.sqrt(histerr)
 
         norm = np.diff(yrange) / bins * np.diff(xrange)
-
+    
         return pd.DataFrame({
             'x': 0.5 * (edges[1:] + edges[:-1]),
             'y': hist / norm,
