@@ -26,7 +26,7 @@ out_dir = pathlib.Path(project_dir, f'result/{str(exe_name)}/sigma10.05_b3fm')
 out_dir.mkdir(exist_ok=True, parents=True)
 
 reaction = 'Ca40Ni58'
-energy = 56
+energy = 140
 skyrme = 'SkM'
 mode = "3"
 Nc = (11, 25)

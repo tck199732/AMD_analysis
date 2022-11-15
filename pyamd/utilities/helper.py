@@ -8,6 +8,22 @@ class DataFrameHelper:
     def __init__(self):
         pass
 
+    def product1d(self, df1, df2):
+        df1 = df1.copy()
+        df2 = df2.copy()
+        if np.any(df1.x.to_numpy() != df2.x.to_numpy()):
+            raise ValueError('dfs have differnet x.')
+        x = df1.x
+        y = df1.y * df2.y
+        yerr = y * np.sqrt(df1['y_ferr']**2 + df2['y_ferr']**2)
+
+        return pd.DataFrame({
+            'x': x,
+            'y': y,
+            'y_err': yerr,
+            'y_ferr': np.divide(yerr, y, where=(y != 0.0), out=np.zeros_like(yerr))
+        })
+    
     # df2 / df1
     def ratio1d(self, df1, df2):
         df1 = df1.copy()
