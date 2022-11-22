@@ -30,6 +30,7 @@ dependencies:
    - scikit-learn>=0.24.0
   #  - ruptures>=1.1.4
    - lmfit>=1.0.0
+   - fortranformat=1.2.2
   #  - emcee>=3.0.0
 
    # plotting

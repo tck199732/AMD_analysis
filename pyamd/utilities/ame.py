@@ -114,6 +114,10 @@ class AME:
         A = row['A'].values[0]
         return (A * constants.u * constants.c**2 + mass_excess * units.keV).to('MeV')
 
+    def get_symbol(self, N, Z):
+        row = self.df.loc[((self.df['N'] == N) & (self.df['Z'] == Z))]
+        return row['symbol'].values[0]
+
 
 if __name__ == '__main__':
     ame = AME()
