@@ -31,14 +31,15 @@ class SpectraFile:
                 else:
                     return [key.GetName() for key in file.GetListOfKeys() if key.GetName().endswith('_' + particle)]
 
-    def get_histogram(self, name=None, particle=None, keyword=None):
+    def get_histogram(self, name=None, particle=None, keyword=None, verbose=1):
         if name is None:
             names = self.get_names(particle)
             names = [name for name in names if keyword.lower() in name.lower()]
             if len(names) == 0:
                 raise ValueError('No objects is returned.')
             name = min(names, key=len)
-            print(f'reading : {name}')
+            if verbose == 1:
+                print(f'reading : {name}')
 
         with root6.TFile(self.path) as file:
             hist = file.Get(name)
@@ -64,13 +65,12 @@ class PtRapidityLAB:
     }
 
     DIR = f'{str(PROJECT_DIR)}/result/spectra'
-
-    def __init__(self, particle, df=None, path=None, reaction='Ca48Ni64E140', skyrme='SkM', impact_parameter=(0., 3.), uball_multiplicity=(1, 25), mode='seq', histname=None):
-
-        self.betacms = e15190.reaction(reaction).get_betacms()
-        self.beam_rapidity = e15190.reaction(reaction).get_rapidity_beam()
-
-        self.reaction = reaction
+    
+    def __init__(self, particle, df=None, path=None, reaction='Ca48Ni64E140', skyrme='SkM', impact_parameter=(0., 3.), uball_multiplicity=(1, 25), mode='seq', histname=None, verbose=0):
+        self.particle = e15190.particle(particle)
+        self.reaction = e15190.reaction(reaction)
+        self.betacms = self.reaction.get_betacms()
+        self.beam_rapidity = self.reaction.get_rapidity_beam()
 
         if df is None:
             if path is None:
@@ -83,7 +83,7 @@ class PtRapidityLAB:
                 histname = f'h2_pta_rapidity_lab_{mode}_{particle}'
 
             df = spectra_file.get_histogram(
-                particle=particle, keyword=histname)
+                particle=particle, keyword=histname, verbose=verbose)
             df = hist_reader.hist2d_to_df(df, keep_zeros=False)
 
         if not 'z_ferr' in df.columns:
@@ -149,7 +149,7 @@ class PtRapidityLAB:
         histerr = np.sqrt(histerr)
 
         norm = np.diff(yrange) / bins * np.diff(xrange)
-    
+
         return pd.DataFrame({
             'x': 0.5 * (edges[1:] + edges[:-1]),
             'y': hist / norm,
@@ -221,6 +221,63 @@ class PtRapidityLAB:
             'z_err': df['z_err'],
             'z_ferr': np.divide(df['z_err'], df['z'], out=np.zeros_like(df['z_err']), where=(df['z'] > 0.0))
         })
+
+    def MomentumRapidityCMS(self, xrange=(0., 1.), yrange=(0., 600.), correct_coverage=False):
+        if correct_coverage:
+            df = self.correct_coverage(xrange=xrange, yrange=yrange)
+        else:
+            df = self.query(xrange=xrange, yrange=yrange)
+
+        mass = 938.272
+        dx = np.diff(np.unique(df.x)[0:2])
+        dy = np.diff(np.unique(df.y)[0:2])
+        pt = df.y + dy * np.random.uniform(-0.5, 0.5, size=len(df.y))
+        rapidity_lab = df.x + dx * \
+            (np.random.uniform(-0.5, 0.5, size=len(df.x)))
+        rapidity_lab *= self.beam_rapidity
+        rapidity_cms = rapidity_lab - 0.5 * \
+            np.log((1.+self.betacms)/(1.-self.betacms))
+
+        pzcms = np.sqrt(pt**2 + mass**2) * np.sinh(rapidity_cms)
+        pcms = np.sqrt(pt**2 + pzcms**2)
+
+        return pd.DataFrame({
+            'x': pcms,
+            'y': rapidity_cms,
+            'z': df['z'],
+            'z_err': df['z_err'],
+            'z_ferr': np.divide(df['z_err'], df['z'], out=np.zeros_like(df['z_err']), where=(df['z'] > 0.0))
+        })
+
+    
+    def MomentumCMS(self, xrange=(0., 1.), yrange=(0., 800.), bins=40, cuts=[(-1.0, 1.0), (0., 800.)], correct_coverage=False):
+        # Projecti Momentum from Momentum-Rapidity
+        df = self.MomentumRapidityCMS(
+            xrange=xrange, yrange=yrange, correct_coverage=correct_coverage)
+
+        df.query(
+            f'y >= {cuts[0][0]} & y <= {cuts[0][1]} & x >= {cuts[1][0]} & x <= {cuts[1][1]}', inplace=True)
+
+        hist, edges = np.histogram(
+            df.x, range=yrange, bins=bins, weights=df['z'])
+
+        histerr, edges = np.histogram(
+            df.x, range=yrange, bins=bins, weights=df['z_err']**2)
+        histerr = np.sqrt(histerr)
+        norm = np.diff(yrange) / bins * np.diff(xrange)
+
+        return pd.DataFrame({
+            'x': 0.5 * (edges[1:] + edges[:-1]),
+            'y': hist / norm,
+            'y_err': histerr/norm,
+            'y_ferr':  np.divide(histerr, hist, out=np.zeros_like(histerr), where=(hist != 0.0))
+        })
+
+    def Multiplicity(self, xrange=(0.4, 0.6), yrange=(0., 600.), bins=30,  correct_coverage=False, correct_range=(0., 600)):
+        # return number of particle after normalization
+        df = self.PtSpectrum(xrange=xrange, yrange=yrange, bins=bins,
+                             correct_coverage=correct_coverage, correct_range=correct_range)
+        return np.sum(df.y) * np.diff(xrange) * np.diff(yrange)/bins
 
 
 class EkinThetaCMS:

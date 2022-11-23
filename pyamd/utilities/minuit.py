@@ -104,6 +104,11 @@ class TMinuit:
     def get_parameter_name(self, n=0):
         return self.parameter_names[n]
 
+# class IMinuit:
+#     def __init__(self, n, fcn):
+#         self.minuit = iminuit.Minuit()
+#         self.fcn = fcn
+
 
 # testing
 '''
@@ -128,3 +133,18 @@ if __name__ == '__main__':
     gMinuit.fit()
 
 '''
+
+
+m = ROOT.TMinuit(2)
+
+
+def model(x, par):
+    return par[0]*x + par[1]
+
+
+def fcn(npar, gin, f, par, iflag):
+    chisq = 0.
+    for i in range(len(x)):
+        delta = (model(x[i], par) - y[i]) / yerr[i]
+        chisq += delta**2
+    f.value = chisq

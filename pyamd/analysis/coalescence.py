@@ -1,26 +1,29 @@
 import pandas as pd
 import numpy as np
 import itertools
+from pyamd.e15190 import e15190
 from pyamd.utilities import helper
 df_helper = helper.DataFrameHelper()
 
 
 class Coalescence:
     def __init__(self, reaction, skyrme='SkM', Nc=(11, 25), bimp=(0., 3.)):
-        self.reaction = reaction
+        self.reaction = e15190.reaction(reaction)
         self.skyrme = skyrme
         self.Nc = Nc
         self.bimp = bimp
         self.spectra = dict()
+        self.particles = dict()
 
     def add_spectra(self, particle, df):
+        self.particles[particle] = e15190.particle(particle)
         self.spectra[particle] = df
 
     def pseudo_neutron(self, bins=30, range=(0, 600)):
-
         required_particle = ['p', 't', '3He']
         if not (set(required_particle).issubset(self.spectra)):
-            raise ValueError(f'require {required_particle} spectra for pseudo neutron.')
+            raise ValueError(
+                f'require {required_particle} spectra for pseudo neutron.')
 
         df = dict()
         for pn in required_particle:
@@ -99,11 +102,21 @@ class Coalescence:
             df['n'] = self.pseudo_neutron(bins=bins, range=range)
 
         edges = np.linspace(*range, bins+1)
+
+        # y = 0
+        # yerr = 0
+        # for i, (pn, spec) in enumerate(df.items()):
+        #     if not pn in self.particles:
+        #         continue
+        #     y += df[pn].y * self.particles[pn].N
+        #     yerr += df[pn]['y_err']**2 * self.particles[pn].N **2
+        # yerr = np.sqrt(yerr)
+
         y = df['n'].y + df['d'].y + 2.*df['t'].y + df['3He'].y + 2.*df['4He'].y
         yerr = np.sqrt(
-            df['n']['y_err']**2 + 
-            df['d']['y_err']**2 + 
-            4. *df['t']['y_err']**2 + 
+            df['n']['y_err']**2 +
+            df['d']['y_err']**2 +
+            4. * df['t']['y_err']**2 +
             df['3He']['y_err']**2 +
             4. * df['4He']['y_err']**2
         )
@@ -119,15 +132,15 @@ class Coalescence:
         df = dict()
         for pn in self.spectra:
             df[pn] = df_helper.rebin1d(
-                self.spectra[pn], range=range, bins=bins)
+                self.spectra[pn], rangepppp=range, bins=bins)
 
         edges = np.linspace(*range, bins+1)
         y = df['p'].y + df['d'].y + df['t'].y + 2.*df['3He'].y + 2.*df['4He'].y
         yerr = np.sqrt(
-            df['p']['y_err']**2 + 
-            df['d']['y_err']**2 + 
-            df['t']['y_err']** 2 + 
-            4. * df['3He']['y_err']**2 + 
+            df['p']['y_err']**2 +
+            df['d']['y_err']**2 +
+            df['t']['y_err'] ** 2 +
+            4. * df['3He']['y_err']**2 +
             4. * df['4He']['y_err']**2
         )
 
@@ -137,79 +150,3 @@ class Coalescence:
             'y_err': yerr,
             'y_ferr': np.divide(yerr, y, where=(y != 0.0), out=np.zeros_like(yerr))
         })
-
-    # def coalescence(self, particles=None, coal='p', range=(0, 600), bins=30, pseudo_neutron=True):
-
-    #     if pseudo_neutron:
-    #         if 'n' in self.spectra:
-    #             self.spectra.pop('n')
-    #         self.spectra['n'] = self.pseudo_neutron(range=range, bins=bins)
-    #     if particles is None:
-    #         particles = [particle for particle in self.spectra]
-
-    #     spectra = [self.spectra[particle] for particle in particles]
-    #     keys = [(e15190.particle(particle).Z, e15190.particle(particle).N)
-    #             for particle in particles]
-
-    #     spectra = [helper.rebin1d(df, range=range, bins=bins)
-    #                for df in spectra]
-
-    #     df = pd.concat(spectra, keys=keys, names=['Z', 'N'])
-    #     if coal == 'p':
-    #         y = df.groupby(['x']).apply(
-    #             lambda x: np.sum(x.y * x.index.get_level_values('Z').astype(float)))
-    #     elif coal == 'n':
-    #         y = df.groupby(['x']).apply(
-    #             lambda x: np.sum(x.y * x.index.get_level_values('N').astype(float)))
-
-    #     yerr = df.groupby(['x']).apply(
-    #         lambda x: np.sum(x['y_err']**2))
-    #     yerr = np.sqrt(yerr)
-
-    #     edges = np.linspace(*range, bins+1)
-    #     return pd.DataFrame({
-    #         'x': 0.5 * (edges[1:]+edges[:-1]),
-    #         'y': y,
-    #         'y_err': yerr,
-    #         'y_ferr': np.divide(yerr, y, where=(y != 0.0), out=np.zeros_like(yerr))
-    #     })
-
-    # def coalescence_n(self, df_n=None, df_p=None, df_d=None, df_t=None, df_3He=None, df_4He=None, range=(0, 600), bins=30):
-    #     df_n = helper.rebin1d(df_n, range=range, bins=bins)
-    #     df_p = helper.rebin1d(df_p, range=range, bins=bins)
-    #     df_d = helper.rebin1d(df_d, range=range, bins=bins)
-    #     df_t = helper.rebin1d(df_t, range=range, bins=bins)
-    #     df_3He = helper.rebin1d(df_3He, range=range, bins=bins)
-    #     df_4He = helper.rebin1d(df_4He, range=range, bins=bins)
-
-    #     edges = np.linspace(*range, bins+1)
-    #     y = df_n.y + df_d.y + 2.*df_t.y + df_3He.y + 2.*df_4He.y
-    #     yerr = np.sqrt(df_n['y_err']**2 + df_d['y_err']**2 + 4. *
-    #                    df_t['y_err']**2 + df_3He['y_err']**2 + 4. * df_4He['y_err']**2)
-
-    #     return pd.DataFrame({
-    #         'x': 0.5 * (edges[1:]+edges[:-1]),
-    #         'y': y,
-    #         'y_err': yerr,
-    #         'y_ferr': np.divide(yerr, y, where=(y != 0.0), out=np.zeros_like(yerr))
-    #     })
-
-    # def coalescence_p(self, df_n=None, df_p=None, df_d=None, df_t=None, df_3He=None, df_4He=None, range=(0, 600), bins=30):
-    #     df_n = helper.rebin1d(df_n, range=range, bins=bins)
-    #     df_p = helper.rebin1d(df_p, range=range, bins=bins)
-    #     df_d = helper.rebin1d(df_d, range=range, bins=bins)
-    #     df_t = helper.rebin1d(df_t, range=range, bins=bins)
-    #     df_3He = helper.rebin1d(df_3He, range=range, bins=bins)
-    #     df_4He = helper.rebin1d(df_4He, range=range, bins=bins)
-
-    #     edges = np.linspace(*range, bins+1)
-    #     y = df_p.y + df_d.y + df_t.y + 2. * df_3He.y + 2. * df_4He.y
-    #     yerr = np.sqrt(df_p['y_err']**2 + df_d['y_err']**2 + df_t['y_err']
-    #                    ** 2 + 4. * df_3He['y_err']**2 + 4. * df_4He['y_err']**2)
-
-    #     return pd.DataFrame({
-    #         'x': 0.5 * (edges[1:]+edges[:-1]),
-    #         'y': y,
-    #         'y_err': yerr,
-    #         'y_ferr': np.divide(yerr, y, where=(y != 0.0), out=np.zeros_like(yerr))
-    #     })

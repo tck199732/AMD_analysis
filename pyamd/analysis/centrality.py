@@ -46,10 +46,9 @@ class Multiplicity_ImpactParameter:
     DIR = f'{PROJECT_DIR}/result/multiplicity'
 
     def __init__(self, path=None, reaction='Ca48Ni64E140', skyrme='SkM', impact_parameter=(0., 10.), mode='3'):
-
-        self.betacms = e15190.reaction(reaction).get_betacms()
-        self.beam_rapidity = e15190.reaction(reaction).get_rapidity_beam()
-        self.reaction = reaction
+        self.reaction = e15190.reaction(reaction)
+        self.betacms = self.reaction.get_betacms()
+        self.beam_rapidity = self.reaction.get_rapidity_beam()
 
         if path is None:
             path = f'{self.DIR}/{reaction}_{skyrme}_table{mode}_b{impact_parameter[1]:.0f}fm.root'

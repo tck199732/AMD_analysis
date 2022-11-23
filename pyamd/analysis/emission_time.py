@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from copy import copy
 from pyamd import PROJECT_DIR
+from pyamd.e15190 import e15190
 from pyamd.utilities import root6
 hist_reader = root6.HistogramReader()
 
@@ -39,7 +40,7 @@ class EmissionTime:
     DIR = f'{str(PROJECT_DIR)}/result/emission_time'
 
     def __init__(self, particle, path=None, reaction='Ca48Ni64E140', skyrme='SkM', impact_parameter=(0., 3.)):
-        self.particle = particle
+        self.particle = e15190.particle(particle)
         if path is None:
             path = f'{self.DIR}/{reaction}_{skyrme}_bmin{impact_parameter[0]:.1f}_bmax{impact_parameter[1]:.1f}.root'
 

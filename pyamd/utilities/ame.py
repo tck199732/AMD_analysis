@@ -89,7 +89,7 @@ class AME:
         # df['mass'] = df['mass'] * constants.u
         # df['mass'] = list(
         # map(lambda m: (m * units.kg * constants.c**2).to('MeV').value, df['mass']))
-        print(df)
+        # print(df)
         self.df = df
 
     def get_NZ(self, symbol):
