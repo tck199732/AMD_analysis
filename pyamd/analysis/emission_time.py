@@ -45,8 +45,10 @@ class EmissionTime:
             path = f'{self.DIR}/{reaction}_{skyrme}_bmin{impact_parameter[0]:.1f}_bmax{impact_parameter[1]:.1f}.root'
 
         spectrafile = EmissionTimeFile(path)
-        self.df = spectrafile.get_histogram(keyword=f'h2_time_momentum_{particle}')
-        self.profile = self.df.ProfileX(name='profile', firstybin=1, lastybin=-1)
+        self.df = spectrafile.get_histogram(
+            keyword=f'h2_time_momentum_{particle}')
+        self.profile = self.df.ProfileX(
+            name='profile', firstybin=1, lastybin=-1)
         self.profile = hist_reader.hist1d_to_df(self.profile)
         self.df = hist_reader.hist2d_to_df(self.df)
 
@@ -95,8 +97,10 @@ class EmissionTime:
 
     def AverageEmissionTime(self, range=(0, 600), bins=30):
         df = self.profile.copy()
-        hist, x_edges = np.histogram(df.x, range=range, bins=bins, weights=df.y)
-        hist_err, x_edges = np.histogram(df.x, range=range, bins=bins, weights=df['y_err']**2)
+        hist, x_edges = np.histogram(
+            df.x, range=range, bins=bins, weights=df.y)
+        hist_err, x_edges = np.histogram(
+            df.x, range=range, bins=bins, weights=df['y_err']**2)
         hist_err = np.sqrt(hist_err)
         dt = np.diff(range) / bins
         return pd.DataFrame({
@@ -105,7 +109,6 @@ class EmissionTime:
             'y_err': hist_err / dt,
             'y_ferr': np.divide(hist_err, hist, where=(hist > 0.0), out=np.zeros_like(hist_err))
         })
-
 
     def plot2d(self, ax=None, df=None, cmap='jet', **kwargs):
         cmap = copy(plt.cm.get_cmap(cmap))
@@ -128,15 +131,65 @@ class EmissionTime:
 
     def plot1d(self, ax=None, range=(0, 600), bins=30, drop_large_error=True, thres=0.05, **kwargs):
         kw = dict(
-            fmt = '.'
+            fmt='.'
         )
         kw.update(kwargs)
         df = self.AverageEmissionTime(range=range, bins=bins)
         df.query('y > 0.0', inplace=True)
         # if drop_large_error:
-            # df.query(f'y_ferr < {thres}', inplace=True)
+        # df.query(f'y_ferr < {thres}', inplace=True)
         if ax is None:
             ax = plt.gca()
 
         ax.errorbar(df.x, df.y, yerr=df['y_err'], **kw)
         return ax
+
+
+class EmissionPosition:
+    def __init__(self, path, particle, reaction, skyrme):
+        self.reaction = e15190.reaction(reaction)
+        self.particle = e15190.particle(particle)
+        self.skyrme = skyrme
+
+        spectrafile = EmissionTimeFile(path)
+        df = spectrafile.get_histogram(keyword=f'h2_time_position_{particle}')
+        # x = position; y = time;
+        self.df = hist_reader.hist2d_to_df(df)
+
+    def get_source_fcn(self, bins=400, range=(0, 40), cuts=[(0, 40), (0, 500)], normalize=True, jacobian=True):
+
+        df = self.df.copy()
+        df.query(
+            f'x >= {cuts[0][0]} & x <= {cuts[0][1]} & y >= {cuts[1][0]} & y<= {cuts[1][1]}', inplace=True)
+
+        hist, edges = np.histogram(
+            df.x, bins=bins, range=range, weights=df['z'])
+        histerr, edges = np.histogram(
+            df.x, bins=bins, range=range, weights=df['z_err'])
+        histerr = np.sqrt(histerr)
+
+        x = 0.5 * (edges[1:] + edges[:-1])
+
+        if jacobian:
+            hist = hist * 4. * np.pi * x**2
+            histerr = histerr * 4. * np.pi * x**2
+            if normalize:
+                scale = np.sum(hist * (x[1] - x[0]))
+                hist /= scale
+                histerr /= scale
+
+        return pd.DataFrame({
+            'x': x,
+            'y': hist,
+            'y_err': histerr,
+            'y_ferr': np.divide(histerr, hist, where=hist != 0., out=np.zeros_like(histerr)),
+        })
+
+    def get_source_size(self, bins=400, range=(0, 40), cuts=[(0, 40), (0, 500)], ):
+        df = self.get_source_fcn(
+            bins=bins, range=range, cuts=cuts, normalize=True, jacobian=True)
+        half_maximum = df.y.max() / 2.
+        id = np.abs(df.y - half_maximum).arcmin()
+        return df.x[id]
+
+    # def gaus_soruce(self, )

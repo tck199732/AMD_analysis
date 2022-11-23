@@ -119,17 +119,17 @@ void manager::read()
             particle.set_xyzt(x[i], y[i], z[i], t[i]);
             particle.autofill(this->betacms);
 
-            if (particle.t == 0.0)
+            if (particle.t <= 0.0)
             {
                 count_neg_time += 1.;
-                std::cout << particle.t << std::endl;
+                continue;
             }
             this->hist.fill(particle, 1.);
         }
 
         this->hist.norm += 1.;
     }
-    std::cout << count_neg_time << std::endl;
+    std::cout << "number fo unphysical emission time : " << count_neg_time << std::endl;
 }
 
 void manager::finish()
