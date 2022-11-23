@@ -25,10 +25,21 @@ database = pathlib.Path(project_dir, 'database')
 # root_dir = pathlib.Path('/data/amd/nov2022/sigma_free')
 # list_dir = pathlib.Path(database, 'inputlist/nov2022/sigma_free')
 
-dat_dir = pathlib.Path('/data/amd/nov2022/sigma10.05')
-root_dir = pathlib.Path('/data/amd/nov2022/sigma10.05')
-list_dir = pathlib.Path(database, 'inputlist/nov2022/sigma10.05')
+# dat_dir = pathlib.Path('/data/amd/nov2022/sigma10.05')
+# root_dir = pathlib.Path('/data/amd/nov2022/sigma10.05')
+# list_dir = pathlib.Path(database, 'inputlist/nov2022/sigma10.05')
 
+dat_dir = pathlib.Path('/data/amd/nov2022/sigma0.25')
+root_dir = pathlib.Path('/data/amd/nov2022/sigma0.25')
+list_dir = pathlib.Path(database, 'inputlist/nov2022/sigma0.25')
+
+# dat_dir = pathlib.Path('/data/amd/nov2022/sigma5.05')
+# root_dir = pathlib.Path('/data/amd/nov2022/sigma5.05')
+# list_dir = pathlib.Path(database, 'inputlist/nov2022/sigma5.05')
+
+# dat_dir = pathlib.Path('/data/amd/nov2022/sigma0.45')
+# root_dir = pathlib.Path('/data/amd/nov2022/sigma0.45')
+# list_dir = pathlib.Path(database, 'inputlist/nov2022/sigma0.45')
 
 ##########################################################################
 nuclei = ['Ca40Ni58', 'Ca48Ni64', 'Ca40Sn112', 'Ca48Sn124']
@@ -42,12 +53,13 @@ exe = pathlib.Path(str(project_dir), 'bin/amd2root')
 path_list = {rec: pathlib.Path(list_dir, f'{name}.list')
              for rec, name in zip(reaction, rec_name)}
 
+
 def main():
     os.chdir(f'{str(project_dir)}/bin')
     root_libs = subprocess.run('root-config --libs --glibs --cflags',
-                                    shell=True, capture_output=True, text=True, encoding='utf-8')
-    subprocess.run(f'g++ amd2root.cpp -o amd2root -I{root_libs.stdout.strip()}', shell=True)
-
+                               shell=True, capture_output=True, text=True, encoding='utf-8')
+    subprocess.run(
+        f'g++ amd2root.cpp -o amd2root -I{root_libs.stdout.strip()}', shell=True)
 
     # while not exe.exists():
     #     try:
@@ -68,7 +80,6 @@ def main():
     #         if not current_env == f'{str(project_dir)}/env':
     #             os.chdir(str(project_dir))
     #             subprocess.run(f'conda activate ./env', shell=True)
-
 
     run(mode='21')
     run(mode='21t')
@@ -106,7 +117,7 @@ def run(mode):
             inputs = [rec[0], mode, dat, out]
             inputs = list(map(str, inputs))
             if mode == '21t':
-                inputs.extend(list(map(str,[ch, gid])))
+                inputs.extend(list(map(str, [ch, gid])))
             args = ' '.join(inputs)
             print(args)
             subprocess.run(f'{str(exe)} {args}', shell=True, text=True)

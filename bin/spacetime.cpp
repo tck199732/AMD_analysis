@@ -119,7 +119,7 @@ void manager::read()
             particle.set_xyzt(x[i], y[i], z[i], t[i]);
             particle.autofill(this->betacms);
 
-            if (particle.t <= 0.0)
+            if (particle.t == 0.0)
             {
                 count_neg_time += 1.;
                 std::cout << particle.t << std::endl;

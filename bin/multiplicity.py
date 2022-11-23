@@ -11,8 +11,8 @@ src_dir = pathlib.Path(project_dir, 'src')
 exe_name = pathlib.Path(__file__).stem
 path_main = pathlib.Path(exe_dir, f'{str(exe_name)}.cpp')
 
-# input_dir = pathlib.Path('/data/amd/dec2021/b3fm/filtered')
-# out_dir = pathlib.Path(project_dir, f'result/{str(exe_name)}/sigma0.85_b3fm')
+input_dir = pathlib.Path('/data/amd/dec2021/b3fm/filtered')
+out_dir = pathlib.Path(project_dir, f'result/{str(exe_name)}/sigma0.85_b3fm')
 
 # input_dir = pathlib.Path('/data/amd/nov2022/sigma100/filtered')
 # out_dir = pathlib.Path(project_dir, f'result/{str(exe_name)}/sigma100_b3fm')
@@ -20,8 +20,17 @@ path_main = pathlib.Path(exe_dir, f'{str(exe_name)}.cpp')
 # input_dir = pathlib.Path('/data/amd/nov2022/sigma_free/filtered')
 # out_dir = pathlib.Path(project_dir, f'result/{str(exe_name)}/sigma_free_b3fm')
 
-input_dir = pathlib.Path('/data/amd/nov2022/sigma10.05/filtered')
-out_dir = pathlib.Path(project_dir, f'result/{str(exe_name)}/sigma10.05_b3fm')
+# input_dir = pathlib.Path('/data/amd/nov2022/sigma10.05/filtered')
+# out_dir = pathlib.Path(project_dir, f'result/{str(exe_name)}/sigma10.05_b3fm')
+
+# input_dir = pathlib.Path('/data/amd/nov2022/sigma0.25/filtered')
+# out_dir = pathlib.Path(project_dir, f'result/{str(exe_name)}/sigma0.25_b3fm')
+
+# input_dir = pathlib.Path('/data/amd/nov2022/sigma0.45/filtered')
+# out_dir = pathlib.Path(project_dir, f'result/{str(exe_name)}/sigma0.45_b3fm')
+
+# input_dir = pathlib.Path('/data/amd/nov2022/sigma5.05/filtered')
+# out_dir = pathlib.Path(project_dir, f'result/{str(exe_name)}/sigma5.05_b3fm')
 
 out_dir.mkdir(exist_ok=True, parents=True)
 
