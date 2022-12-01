@@ -9,7 +9,6 @@ from astropy import units, constants
 
 path_download = pathlib.Path(PROJECT_DIR, 'database/ame')
 
-
 class AME:
     def __init__(self, url=None, dl_path=None):
         if url is None:

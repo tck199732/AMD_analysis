@@ -1,33 +1,24 @@
+from pyamd import PROJECT_DIR, DATABASE, EXE_DIR, SRC_DIR
 import subprocess
 import pathlib
 import os
 import time
-from tracemalloc import start
 
-project_dir = pathlib.Path(os.environ['CONDA_PREFIX']).parent
-database = pathlib.Path(project_dir, f'database')
+path_main = pathlib.Path(EXE_DIR, 'spectra.cpp')
 
-exe_dir = pathlib.Path(project_dir, 'bin')
-src_dir = pathlib.Path(project_dir, 'src')
-path_main = pathlib.Path(exe_dir, 'spectra.cpp')
+# input_dir = pathlib.Path('/data/amd/dec2021/b3fm/filtered')
+# out_dir = pathlib.Path(PROJECT_DIR, 'result/spectra/sigma0.85_b3fm')
 
-input_dir = pathlib.Path('/data/amd/dec2021/b3fm/filtered')
-out_dir = pathlib.Path(project_dir, 'result/spectra/sigma0.85_b3fm')
-
-# input_dir = pathlib.Path('/data/amd/nov2022/sigma100/filtered')
-# out_dir = pathlib.Path(project_dir, 'result/spectra/sigma100_b3fm')
-
-# input_dir = pathlib.Path('/data/amd/nov2022/sigma0.25/filtered')
-# out_dir = pathlib.Path(project_dir, 'result/spectra/sigma0.25_b3fm')
-
-out_dir.mkdir(exist_ok=True)
+input_dir = pathlib.Path('/data/amd/nov2022/sigma0.85/filtered')
+out_dir = pathlib.Path(PROJECT_DIR, 'result/spectra/sigma0.85_b3fm')
+out_dir.mkdir(exist_ok=True, parents=True)
 
 
 # reaction = 'Ca40Ni58'
-reaction = 'Ca48Ni64'
+reaction = 'Ca48Sn124'
 energy = 140
 skyrme = 'SkM'
-Nc = (11, 25)
+Nc = (1, 25)
 bimp = (0., 3.)
 
 
@@ -36,9 +27,9 @@ def main():
                               capture_output=True, shell=True, text=True, encoding='utf-8')
     root_inc = root_inc.stdout.strip()
 
-    exe = pathlib.Path(exe_dir, path_main.stem)
+    exe = pathlib.Path(EXE_DIR, path_main.stem)
     subprocess.run(
-        f'g++ {str(path_main)} -o {str(exe)} -I{root_inc} -I{str(src_dir)}', shell=True, text=True)
+        f'g++ {str(path_main)} -o {str(exe)} -I{root_inc} -I{str(SRC_DIR)}', shell=True, text=True)
 
     path_data21 = pathlib.Path(
         input_dir, f'{reaction}E{energy}_{skyrme}_table21.root')

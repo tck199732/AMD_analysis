@@ -17,29 +17,10 @@ database = pathlib.Path(project_dir, 'database')
 # root_dir = pathlib.Path('/data/amd/feb2022/b10fm')
 # list_dir = pathlib.Path(database, 'inputlist/feb2022')
 
-# dat_dir = pathlib.Path('/data/amd/nov2022/sigma100')
-# root_dir = pathlib.Path('/data/amd/nov2022/sigma100')
-# list_dir = pathlib.Path(database, 'inputlist/nov2022/sigma100')
+dat_dir = pathlib.Path('/data/amd/nov2022/sigma100')
+root_dir = pathlib.Path('/data/amd/nov2022/sigma100')
+list_dir = pathlib.Path(database, 'inputlist/nov2022/sigma100')
 
-# dat_dir = pathlib.Path('/data/amd/nov2022/sigma_free')
-# root_dir = pathlib.Path('/data/amd/nov2022/sigma_free')
-# list_dir = pathlib.Path(database, 'inputlist/nov2022/sigma_free')
-
-# dat_dir = pathlib.Path('/data/amd/nov2022/sigma10.05')
-# root_dir = pathlib.Path('/data/amd/nov2022/sigma10.05')
-# list_dir = pathlib.Path(database, 'inputlist/nov2022/sigma10.05')
-
-dat_dir = pathlib.Path('/data/amd/nov2022/sigma0.25')
-root_dir = pathlib.Path('/data/amd/nov2022/sigma0.25')
-list_dir = pathlib.Path(database, 'inputlist/nov2022/sigma0.25')
-
-# dat_dir = pathlib.Path('/data/amd/nov2022/sigma5.05')
-# root_dir = pathlib.Path('/data/amd/nov2022/sigma5.05')
-# list_dir = pathlib.Path(database, 'inputlist/nov2022/sigma5.05')
-
-# dat_dir = pathlib.Path('/data/amd/nov2022/sigma0.45')
-# root_dir = pathlib.Path('/data/amd/nov2022/sigma0.45')
-# list_dir = pathlib.Path(database, 'inputlist/nov2022/sigma0.45')
 
 ##########################################################################
 nuclei = ['Ca40Ni58', 'Ca48Ni64', 'Ca40Sn112', 'Ca48Sn124']

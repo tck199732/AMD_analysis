@@ -6,9 +6,10 @@ import matplotlib.pyplot as plt
 from copy import copy
 from pyamd import PROJECT_DIR
 from pyamd.e15190 import e15190
-from pyamd.utilities import root6
+from pyamd.utilities import root6, minuit, helper
+import iminuit
 hist_reader = root6.HistogramReader()
-
+df_helper = helper.DataFrameHelper()
 
 class EmissionTimeFile:
     def __init__(self, path):
@@ -95,8 +96,10 @@ class EmissionTime:
         })
     '''
 
-    def AverageEmissionTime(self, range=(0, 600), bins=30):
+    def AverageEmissionTime(self, range=(0, 600), bins=30, drop_zero_time=True):
         df = self.profile.copy()
+        if drop_zero_time:
+            df.query('y >= 1.', inplace=True)
         hist, x_edges = np.histogram(
             df.x, range=range, bins=bins, weights=df.y)
         hist_err, x_edges = np.histogram(
@@ -110,7 +113,7 @@ class EmissionTime:
             'y_ferr': np.divide(hist_err, hist, where=(hist > 0.0), out=np.zeros_like(hist_err))
         })
 
-    def plot2d(self, ax=None, df=None, cmap='jet', **kwargs):
+    def plot2d(self, ax=None, df=None, cmap='jet',  drop_zero_time=True, **kwargs):
         cmap = copy(plt.cm.get_cmap(cmap))
         cmap.set_under('white')
 
@@ -123,6 +126,9 @@ class EmissionTime:
 
         if df is None:
             df = self.df.copy()
+
+        if drop_zero_time:
+            df.query('y >= 1.0', inplace=True)
 
         if ax is None:
             ax = plt.gca()
@@ -156,27 +162,31 @@ class EmissionPosition:
         # x = position; y = time;
         self.df = hist_reader.hist2d_to_df(df)
 
-    def get_source_fcn(self, bins=400, range=(0, 40), cuts=[(0, 40), (0, 500)], normalize=True, jacobian=True):
+    def get_source_fcn(self, bins=400, range=(0, 40), cuts=[(0, 40), (1., 500)], normalize=True, jacobian=True):
 
         df = self.df.copy()
         df.query(
             f'x >= {cuts[0][0]} & x <= {cuts[0][1]} & y >= {cuts[1][0]} & y<= {cuts[1][1]}', inplace=True)
 
+        x = np.linspace(*range, bins+1)
+        x = 0.5 * (x[1:] + x[:-1])
+
+        df['weight'] = df['z']
+        df['err_weight'] = df['z_err']
+        if jacobian:
+            df['weight'] = df['z'] / (4. * np.pi * df['x']**2)
+            df['err_weight'] = df['z_err'] / (4. * np.pi * df['x']**2)
+
         hist, edges = np.histogram(
-            df.x, bins=bins, range=range, weights=df['z'])
+            df.x, bins=bins, range=range, weights=df['weight'])
         histerr, edges = np.histogram(
-            df.x, bins=bins, range=range, weights=df['z_err'])
+            df.x, bins=bins, range=range, weights=df['err_weight'])
         histerr = np.sqrt(histerr)
 
-        x = 0.5 * (edges[1:] + edges[:-1])
-
-        if jacobian:
-            hist = hist * 4. * np.pi * x**2
-            histerr = histerr * 4. * np.pi * x**2
-            if normalize:
-                scale = np.sum(hist * (x[1] - x[0]))
-                hist /= scale
-                histerr /= scale
+        if normalize:
+            scale = np.sum(4. * np.pi * x**2 * hist * (x[1] - x[0]))
+            hist /= scale
+            histerr /= scale
 
         return pd.DataFrame({
             'x': x,
@@ -185,6 +195,7 @@ class EmissionPosition:
             'y_ferr': np.divide(histerr, hist, where=hist != 0., out=np.zeros_like(histerr)),
         })
 
+
     def get_source_size(self, bins=400, range=(0, 40), cuts=[(0, 40), (0, 500)], ):
         df = self.get_source_fcn(
             bins=bins, range=range, cuts=cuts, normalize=True, jacobian=True)
@@ -192,4 +203,51 @@ class EmissionPosition:
         id = np.abs(df.y - half_maximum).arcmin()
         return df.x[id]
 
-    # def gaus_soruce(self, )
+    # should only run once.
+    def fit_gaussian(self, bins=400, range=(0, 40), cuts=[(0, 40), (0, 500)]):
+        df = self.get_source_fcn(
+            bins=bins, range=range, cuts=cuts, normalize=True, jacobian=True)
+        
+        global model
+        model = lambda r, l, r0 : l / (2 * np.sqrt(np.pi) * r0)**3 * np.exp(-r**2 / 4 / r0**2)
+
+        least_squares = iminuit.cost.LeastSquares(df.x, df.y, df['y_err'], model)
+        minuit = iminuit.Minuit(least_squares, l=1.0, r0=3.)
+        minuit.migrad()
+        return minuit
+        # return (*minuit.values, model(df.x, *minuit.values))
+
+    def get_gaussian_parameters(self):
+        return self.fit_gaussian().values
+    def get_gaussian_errors(self):
+        return self.fit_gaussian().errors
+    
+        
+    
+    def plot2d(self, ax=None, df=None, cmap='jet',  drop_zero_time=True, **kwargs):
+        cmap = copy(plt.cm.get_cmap(cmap))
+        cmap.set_under('white')
+
+        kw = dict(
+            cmap=cmap,
+            range=[(0, 40), (0, 500)],
+            bins=[400, 100]
+        )
+        kw.update(kwargs)
+
+        if df is None:
+            df = self.df.copy()
+
+        if drop_zero_time:
+            df.query('y >= 1.0', inplace=True)
+
+        if ax is None:
+            ax = plt.gca()
+        ax.hist2d(df.x, df.y, weights=df['z'], **kw)
+        return ax
+
+    def plot1d(self, ax=None, bins=400, range=(0, 40), cuts=[(0, 40), (0, 500)], normalize=True, jacobian=True, **kwargs):
+        df = self.get_source_fcn(bins=bins, range=range, cuts=cuts, normalize=normalize, jacobian=jacobian)
+        return df_helper.plot1d(ax, df, **kwargs)
+        
+        

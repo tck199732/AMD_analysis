@@ -7,6 +7,7 @@ import sys
 import numpy as np
 from array import array
 import ctypes
+import iminuit
 
 try:
     import ROOT
@@ -103,6 +104,7 @@ class TMinuit:
 
     def get_parameter_name(self, n=0):
         return self.parameter_names[n]
+
 
 # class IMinuit:
 #     def __init__(self, n, fcn):

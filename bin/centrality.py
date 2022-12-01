@@ -1,24 +1,23 @@
+from pyamd import PROJECT_DIR, DATABASE, EXE_DIR, SRC_DIR
 import subprocess
 import pathlib
 import os
 import time
 
-project_dir = pathlib.Path(os.environ['CONDA_PREFIX']).parent
-database = pathlib.Path(project_dir, f'database')
 
-src_dir = pathlib.Path(project_dir, 'src')
-exe_dir = pathlib.Path(project_dir, 'bin')
 exe_name = pathlib.Path(__file__).stem
-path_main = pathlib.Path(exe_dir, f'{str(exe_name)}.cpp')
-exe = pathlib.Path(exe_dir, exe_name)
+path_main = pathlib.Path(EXE_DIR, f'{str(exe_name)}.cpp')
+exe = pathlib.Path(EXE_DIR, exe_name)
 
-input_dir = pathlib.Path('/data/amd/feb2022/b10fm/filtered')
+# input_dir = pathlib.Path('/data/amd/feb2022/b10fm/filtered')
 # input_dir = pathlib.Path('/data/amd/dec2021/b3fm/filtered')
-out_dir = pathlib.Path(project_dir, f'result/{exe_name}/b10fm')
-# out_dir = pathlib.Path(project_dir, f'result/{exe_name}/b3fm')
+input_dir = pathlib.Path('/data/amd/nov2022/sigma0.85/filtered')
+
+# out_dir = pathlib.Path(PROJECT_DIR, f'result/{exe_name}/b10fm')
+out_dir = pathlib.Path(PROJECT_DIR, f'result/{exe_name}/b3fm')
 out_dir.mkdir(exist_ok=True, parents=True)
 
-reaction = 'Ca48Ni64'
+reaction = 'Ca48Sn124'
 energy = 140
 mode = '3'
 skyrme = 'SkM'
@@ -30,7 +29,7 @@ def main():
     root_inc = root_inc.stdout.strip()
 
     subprocess.run(
-        f'g++ {str(path_main)} -o {str(exe)} -I{root_inc} -I{str(src_dir)}', shell=True, text=True)
+        f'g++ {str(path_main)} -o {str(exe)} -I{root_inc} -I{str(SRC_DIR)}', shell=True, text=True)
 
     path_data = pathlib.Path(
         input_dir, f'{reaction}E{energy}_{skyrme}_table{mode}.root')

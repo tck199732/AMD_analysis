@@ -65,7 +65,7 @@ class PtRapidityLAB:
     }
 
     DIR = f'{str(PROJECT_DIR)}/result/spectra'
-    
+
     def __init__(self, particle, df=None, path=None, reaction='Ca48Ni64E140', skyrme='SkM', impact_parameter=(0., 3.), uball_multiplicity=(1, 25), mode='seq', histname=None, verbose=0):
         self.particle = e15190.particle(particle)
         self.reaction = e15190.reaction(reaction)
@@ -249,7 +249,6 @@ class PtRapidityLAB:
             'z_ferr': np.divide(df['z_err'], df['z'], out=np.zeros_like(df['z_err']), where=(df['z'] > 0.0))
         })
 
-    
     def MomentumCMS(self, xrange=(0., 1.), yrange=(0., 800.), bins=40, cuts=[(-1.0, 1.0), (0., 800.)], correct_coverage=False):
         # Projecti Momentum from Momentum-Rapidity
         df = self.MomentumRapidityCMS(

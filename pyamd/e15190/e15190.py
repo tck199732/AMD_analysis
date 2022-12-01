@@ -35,8 +35,8 @@ class particle:
 
     def __init__(self, name):
         if name in self.NZ:
-            name = ame_table.get_symbol(*self.NZ[name])
             self.N, self.Z = self.NZ[name]
+            name = ame_table.get_symbol(*self.NZ[name])
 
         self.name = name
         self.mass = ame_table.get_mass(self.name)
@@ -75,20 +75,18 @@ class reaction:
         self.beam_mass = ame_table.get_mass(beam)
         self.target_mass = ame_table.get_mass(target)
 
-
     def get_name(self, latex=False):
         if latex:
             name = r'$^{{beamA}}{beam} + ^{{targetA}}{target} @ {beamE}$ MeV/A'.format(
-                beamA = self.beamA,
-                beam = self.beam,
-                targetA = self.targetA,
-                target = self.target,
-                beamE = self.beam_energy.value
+                beamA=self.beamA,
+                beam=self.beam,
+                targetA=self.targetA,
+                target=self.target,
+                beamE=self.beam_energy.value
             )
         else:
             name = f'{self.beam}{self.beamA}{self.target}{self.targetA}E{self.beam_energy.value}'
         return name
-
 
     def get_betacms(self):
         beam_ke = self.beam_energy * self.beamA
