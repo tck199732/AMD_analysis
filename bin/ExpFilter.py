@@ -1,27 +1,22 @@
+from pyamd import PROJECT_DIR, DATABASE, EXE_DIR, SRC_DIR
 import subprocess
 import pathlib
 import os
 import itertools
 
-project_dir = pathlib.Path(os.environ['CONDA_PREFIX']).parent
-database = pathlib.Path(project_dir, f'database')
-exe_dir = pathlib.Path(project_dir, 'bin')
-exe = pathlib.Path(exe_dir, 'ExpFilter')
-src_dir = pathlib.Path(project_dir, 'src')
+exe = pathlib.Path(EXE_DIR, 'ExpFilter')
 
-# list_dir = pathlib.Path(database, 'inputlist/feb2022')
+# list_dir = pathlib.Path(DATABASE, 'inputlist/feb2022')
 # input_dir = pathlib.Path('/data/amd/feb2022/b10fm')
 # out_dir = pathlib.Path('/data/amd/feb2022/b10fm/filtered')
 
-# list_dir = pathlib.Path(database, 'inputlist/dec2021')
+# list_dir = pathlib.Path(DATABASE, 'inputlist/dec2021')
 # input_dir = pathlib.Path('/data/amd/dec2021/b3fm')
 # out_dir = pathlib.Path('/data/amd/dec2021/b3fm/filtered')
 
-
-list_dir = pathlib.Path(database, 'inputlist/nov2022/sigma100')
+list_dir = pathlib.Path(DATABASE, 'inputlist/nov2022/sigma100')
 input_dir = pathlib.Path('/data/amd/nov2022/sigma100')
 out_dir = pathlib.Path('/data/amd/nov2022/sigma100/filtered')
-
 
 out_dir.mkdir(exist_ok=True)
 
@@ -36,9 +31,9 @@ path_list = {rec: pathlib.Path(list_dir, f'{name}.list')
 
 
 def main():
-    os.chdir(exe_dir)
+    os.chdir(EXE_DIR)
     subprocess.run(
-        f'g++ ExpFilter.cpp -o ExpFilter -I`root-config --cflags --libs --glibs` -I{str(src_dir)}', shell=True)
+        f'g++ ExpFilter.cpp -o ExpFilter -I`root-config --cflags --libs --glibs` -I{str(SRC_DIR)}', shell=True)
 
     for i, (rec, rlist) in enumerate(path_list.items()):
         if not rlist.exists():

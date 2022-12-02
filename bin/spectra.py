@@ -9,16 +9,16 @@ path_main = pathlib.Path(EXE_DIR, 'spectra.cpp')
 # input_dir = pathlib.Path('/data/amd/dec2021/b3fm/filtered')
 # out_dir = pathlib.Path(PROJECT_DIR, 'result/spectra/sigma0.85_b3fm')
 
-input_dir = pathlib.Path('/data/amd/nov2022/sigma0.85/filtered')
-out_dir = pathlib.Path(PROJECT_DIR, 'result/spectra/sigma0.85_b3fm')
+input_dir = pathlib.Path('/data/amd/nov2022/sigma100/filtered')
+out_dir = pathlib.Path(PROJECT_DIR, 'result/spectra/sigma100_b3fm')
 out_dir.mkdir(exist_ok=True, parents=True)
 
 
-# reaction = 'Ca40Ni58'
-reaction = 'Ca48Sn124'
+reaction = 'Ca48Ni64'
+# reaction = 'Ca48Sn124'
 energy = 140
 skyrme = 'SkM'
-Nc = (1, 25)
+Nc = (11, 25)
 bimp = (0., 3.)
 
 

@@ -1,25 +1,23 @@
+from pyamd import PROJECT_DIR, DATABASE, EXE_DIR, SRC_DIR
 import inspect
 import itertools
 import subprocess
 import pathlib
 import os
 import re
-import glob
 
-project_dir = pathlib.Path(os.environ['CONDA_PREFIX']).parent
-database = pathlib.Path(project_dir, 'database')
 
 # dat_dir = pathlib.Path('/data/amd/dec2021/b3fm')
 # root_dir = pathlib.Path('/data/amd/dec2021/b3fm')
-# list_dir = pathlib.Path(database, 'inputlist/dec2021')
+# list_dir = pathlib.Path(DATABASE, 'inputlist/dec2021')
 
 # dat_dir = pathlib.Path('/data/amd/feb2022/b10fm')
 # root_dir = pathlib.Path('/data/amd/feb2022/b10fm')
-# list_dir = pathlib.Path(database, 'inputlist/feb2022')
+# list_dir = pathlib.Path(DATABASE, 'inputlist/feb2022')
 
 dat_dir = pathlib.Path('/data/amd/nov2022/sigma100')
 root_dir = pathlib.Path('/data/amd/nov2022/sigma100')
-list_dir = pathlib.Path(database, 'inputlist/nov2022/sigma100')
+list_dir = pathlib.Path(DATABASE, 'inputlist/nov2022/sigma100')
 
 
 ##########################################################################
@@ -30,13 +28,13 @@ combination = list(itertools.product(nuclei, energy, skyrme))
 reaction = [(f'{nuc}E{e}', sky) for nuc, e, sky in combination]
 rec_name = [f'{nuc}En{e}MeV_{sky}' for nuc, e, sky in combination]
 ##########################################################################
-exe = pathlib.Path(str(project_dir), 'bin/amd2root')
+exe = pathlib.Path(str(PROJECT_DIR), 'bin/amd2root')
 path_list = {rec: pathlib.Path(list_dir, f'{name}.list')
              for rec, name in zip(reaction, rec_name)}
 
 
 def main():
-    os.chdir(f'{str(project_dir)}/bin')
+    os.chdir(f'{str(PROJECT_DIR)}/bin')
     root_libs = subprocess.run('root-config --libs --glibs --cflags',
                                shell=True, capture_output=True, text=True, encoding='utf-8')
     subprocess.run(
@@ -44,7 +42,7 @@ def main():
 
     # while not exe.exists():
     #     try:
-    #         os.chdir(f'{str(project_dir)}/bin')
+    #         os.chdir(f'{str(PROJECT_DIR)}/bin')
     #         root_libs = subprocess.run('root-config --libs --glibs --cflags',
     #                                    shell=True, capture_output=True, text=True, encoding='utf-8')
     #         subprocess.run(
@@ -58,8 +56,8 @@ def main():
     #             if '*' in env:
     #                 current_env = envs[0].split()[-1]
 
-    #         if not current_env == f'{str(project_dir)}/env':
-    #             os.chdir(str(project_dir))
+    #         if not current_env == f'{str(PROJECT_DIR)}/env':
+    #             os.chdir(str(PROJECT_DIR))
     #             subprocess.run(f'conda activate ./env', shell=True)
 
     run(mode='21')
