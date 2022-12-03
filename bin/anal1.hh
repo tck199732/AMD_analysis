@@ -31,12 +31,6 @@ struct histograms
 
     std::map<std::pair<int, int>, double> mass_table; // nz to mass
 
-    mass_table[{0, 1}] = 938.7830734811444;
-    mass_table[{1, 1}] = 1876.1239277292887;
-    mass_table[{2, 1}] = 2809.432118151433;
-    mass_table[{1, 2}] = 2809.4135261314327;
-    mass_table[{2, 2}] = 3728.4013255385776;
-
     double mass_5Li = 4669.149399085722;
     double mass_6Li = 5603.051494942865;
     double mass_7Li = 6535.36582155001;
@@ -55,6 +49,13 @@ struct histograms
 
 void histograms::init()
 {
+
+    mass_table[{0, 1}] = 938.7830734811444;
+    mass_table[{1, 1}] = 1876.1239277292887;
+    mass_table[{2, 1}] = 2809.432118151433;
+    mass_table[{1, 2}] = 2809.4135261314327;
+    mass_table[{2, 2}] = 3728.4013255385776;
+
     this->h1_invariant_mass_8Be = new TH1D("h1_invariant_mass_8Be", "", 600, -10, 20);
     this->h1_invariant_mass_7Be = new TH1D("h1_invariant_mass_7Be", "", 600, -10, 20);
     this->h1_invariant_mass_7Li = new TH1D("h1_invariant_mass_7Li", "", 600, -10, 20);
@@ -106,29 +107,56 @@ void histograms::fill(const event &event)
         }
     }
 
-    if (alpha_particles.size() > 1)
-    {
-        this->fill_pairs(this->h1_invariant_mass_8Be, alpha_particles, this->mass_8Be);
-    }
-    if (proton_particles.size() >= 1 && alpha_particles.size() > 1)
-    {
-        this->fill_pairs(this->h1_invariant_mass_5Li, proton_particles, alpha_particles, this->mass_5Li);
-    }
-    if (deuteron_particles.size() >= 1 && alpha_particles.size() > 1)
-    {
-        this->fill_pairs(this->h1_invariant_mass_6Li, deuteron_particles, alpha_particles, this->mass_6Li);
-    }
-    if (triton_particles.size() >= 1 && alpha_particles.size() > 1)
-    {
-        this->fill_pairs(this->h1_invariant_mass_7Li, alpha_particles, triton_particles, this->mass_7Li);
-    }
+    this->fill_pairs(this->h1_invariant_mass_5Li, proton_particles, alpha_particles, this->mass_5Li);
 
-    if (He3_particles.size() >= 1 && alpha_particles.size() > 1)
-    {
-        this->fill_pairs(this->h1_invariant_mass_7Be, He3_particles, alpha_particles, this->mass_7Be);
-    }
+    this->fill_pairs(this->h1_invariant_mass_6Li, deuteron_particles, alpha_particles, this->mass_6Li);
+
+    this->fill_pairs(this->h1_invariant_mass_7Li, alpha_particles, triton_particles, this->mass_7Li);
+
+    this->fill_pairs(this->h1_invariant_mass_7Be, He3_particles, alpha_particles, this->mass_7Be);
+
+    this->fill_pairs(this->h1_invariant_mass_8Be, alpha_particles, this->mass_8Be);
 
     this->norm += this->weight;
+}
+
+void histograms::fill_pairs(TH1D *h1, const std::vector<particle> collection, const double &m0)
+{
+    int size = collection.size();
+    if (size <= 1)
+    {
+        return;
+    }
+    for (int i = 0; i < size; i++)
+    {
+        for (int j = i + 1; j < size; j++)
+        {
+
+            int zid1 = collection[i].zid;
+            int zid2 = collection[j].zid;
+            int nid1 = collection[i].nid;
+            int nid2 = collection[j].nid;
+            int aid1 = collection[i].aid;
+            int aid2 = collection[j].aid;
+
+            double px1 = collection[i].px * aid1;
+            double px2 = collection[j].px * aid2;
+            double py1 = collection[i].py * aid1;
+            double py2 = collection[j].py * aid2;
+            double pz1 = collection[i].pz * aid1;
+            double pz2 = collection[j].pz * aid2;
+
+            double m1 = this->mass_table[{nid1, zid1}];
+            double m2 = this->mass_table[{nid2, zid2}];
+
+            double e1 = collection[i].ekincms * aid1 + m1;
+            double e2 = collection[j].ekincms * aid2 + m2;
+
+            double p1p2 = px1 * px2 + py1 * py2 + pz1 * pz2;
+            double M2 = pow(m1, 2.) + pow(m2, 2.) + 2 * (e1 * e2 - p1p2);
+            h1->Fill(TMath::Sqrt(M2) - m0);
+        }
+    }
 }
 
 void histograms::fill_pairs(TH1D *h1, const std::vector<particle> collection1, const std::vector<particle> collection2, const double &m0)
@@ -164,7 +192,7 @@ void histograms::fill_pairs(TH1D *h1, const std::vector<particle> collection1, c
             double m2 = this->mass_table[{nid2, zid2}];
 
             double e1 = collection1[i].ekincms * aid1 + m1;
-            double e2 = collectio21[j].ekincms * aid2 + m2;
+            double e2 = collection2[j].ekincms * aid2 + m2;
 
             double p1p2 = px1 * px2 + py1 * py2 + pz1 * pz2;
             double M2 = pow(m1, 2.) + pow(m2, 2.) + 2 * (e1 * e2 - p1p2);
