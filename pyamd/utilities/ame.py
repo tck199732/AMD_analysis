@@ -23,8 +23,6 @@ class AME:
         with open(str(dl_path), 'w') as file:
             file.write(r.text)
 
-        # self.format = ''
-
         self.read()
 
     def read(self):
