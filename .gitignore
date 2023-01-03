@@ -37,3 +37,7 @@ scripts
 # executable 
 *.exe
 
+# test-area and old scripts
+testing
+old
+

@@ -1,15 +1,13 @@
 
-#include "ExpFilter.hh"
+#include "filter_e15190.hh"
 
 struct manager
 {
     std::string reaction, mode;
-    fs::path data_dir;
-    fs::path path_list;
+    std::vector<std::string> input_pths;
     fs::path path_out;
 
     std::vector<fs::path> data_paths;
-
     system_info *sys_info;
     double betacms, rapidity_beam;
     hira det_hira;
@@ -28,11 +26,18 @@ int main(int argc, char *argv[])
 {
     std::string reaction = argv[1];
     std::string mode = argv[2];
-    std::string data_dir = argv[3];
-    std::string path_list = argv[4];
-    std::string path_out = argv[5];
+    std::string path_out = argv[3];
+    if (argc <= 4)
+    {
+        throw std::invalid_argument("Please provide paths to the data (.root)");
+    }
 
-    manager manager = {reaction, mode, data_dir, path_list, path_out};
+    std::vector<std::string> input_pths;
+    for (int i = 4; i < argc; i++)
+    {
+        input_pths.push_back(argv[i]);
+    }
+    manager manager = {reaction, mode, input_pths, path_out};
     manager.init();
     manager.read();
     manager.finish();
@@ -41,12 +46,10 @@ int main(int argc, char *argv[])
 
 void manager::init()
 {
-    std::string pth_name;
-    std::ifstream pth_stream(fs::absolute(this->path_list));
-    while (pth_stream >> pth_name)
+
+    for (auto &pth : this->input_pths)
     {
-        fs::path pth = this->data_dir / (pth_name + "_table" + this->mode + ".root");
-        std::cout << pth.string();
+        std::cout << pth;
         if (fs::exists(pth))
         {
             std::cout << " exist" << std::endl;
@@ -56,7 +59,7 @@ void manager::init()
         {
             std::cout << " does not exist" << std::endl;
         }
-    };
+    }
 
     std::vector<branch> rbranches = {
         {"multi", "int"},
@@ -201,5 +204,4 @@ void manager::fill(const event &event)
 void manager::finish()
 {
     this->writer->write();
-    std::cout << "DONE" << std::endl;
 }

@@ -299,10 +299,10 @@ void manager::compile21t()
         }
 
         event_processed++;
-        if (event_processed % 1000 == 0)
-        {
-            std::cout << event_processed << std::endl;
-        }
+        // if (event_processed % 1000 == 0)
+        // {
+        //     std::cout << event_processed << std::endl;
+        // }
     }
 }
 
