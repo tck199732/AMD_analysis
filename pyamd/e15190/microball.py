@@ -1,154 +1,164 @@
-
-import os
 import pathlib
 import numpy as np
+import collections
 import pandas as pd
-import matplotlib as mpl
 import matplotlib.pyplot as plt
+import matplotlib as mpl
+from typing import Literal
 
-from pyamd import PROJECT_DIR
+from pyamd import DATABASE
+from pyamd.utilities import style
+style.set_matplotlib_style(mpl)
 
 
 class microball:
+
     def __init__(self, path=None, coordinate='uball'):
         if path is None:
-            self.path = pathlib.Path(
-                PROJECT_DIR, 'database/microball/acceptance/uball_geometry.dat')
-        else:
-            self.path = pathlib.Path(path)
-        self.read_geometry()
+            path = pathlib.Path(DATABASE, 'e15190/microball/acceptance/geometry.dat')
+        
+        self.coordinate = coordinate
+        self.geometry = self._read_geometry(path, coordinate)
+        self.configuration = dict()
+        self.threshold = collections.defaultdict(dict)
 
-        if coordinate == 'hira':
-            self.hira_coordinate()
+        self.configurated = False
+    
+    def _read_geometry(self, path, coordinate):
+        """ Base geometry of microball.  
+        Parameter
+        ---------
+        coordinate : str
+            'uball' : default
+            'hira' : rotate :math: `\phi` angle by 90 degrees.
+        """
+        df = pd.read_csv(str(path), delim_whitespace=True).set_index(['ring', 'det'])
+        if coordinate.lower() == 'hira':
+            df['phi_min'] += 90.
+            df['phi_max'] += 90.
+            
+        for i, row in df.iterrows():
+            if row['phi_min'] >= 360:
+                df.at[i, 'phi_min'] -= 360
 
-        self.read_e15190_config()
+            if row['phi_max'] > 360:
+                df.at[i, 'phi_max'] -= 360
 
-    def read_geometry(self):
-        self.geometry = pd.read_csv(
-            self.path, delim_whitespace=True, comment='#', index_col=False)
-        self.geometry.set_index(['ring', 'det'], inplace=True)
-        return self.geometry
-
-    def hira_coordinate(self):
-
-        self.geometry['phi_min'] = self.geometry['phi_min'] + 90.
-        self.geometry['phi_max'] = self.geometry['phi_max'] + 90.
-
-        for i, row in self.geometry.iterrows():
-            print(i)
-            phi_min = row['phi_min']
-            phi_max = row['phi_max']
-            if phi_min >= 360:
-                self.geometry.at[i, 'phi_min'] -= 360
-                #self.geometry.loc[i]['phi_min'] -= 360
-            if phi_max >= 360:
-                self.geometry.at[i, 'phi_max'] -= 360
-            # elif phi_max < 0:
-                #self.geometry.at[i, 'phi_max'] += 360
-
+        return df
+    
     def get_theta_range(self, ring, det):
         return self.geometry.loc[ring, det]['theta_min'], self.geometry.loc[ring, det]['theta_max']
 
     def get_phi_range(self, ring, det):
         return self.geometry.loc[ring, det]['phi_min'], self.geometry.loc[ring, det]['phi_max']
 
-    def read_e15190_config(self, path=None, system=None):
-        if path is None or system is None:
-            self.config = {
-                2: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-                3: [1, 2,             7, 8, 9, 10, 11, 12],
-                4: [1, 2, 3,          7, 8, 9, 10, 11, 12],
-                5: [1, 2, 3,          7, 8, 9, 10, 11, 12, 13, 14],
-                7: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
-                8: [1, 2, 3,    5, 6, 7, 8, 9, 10],
-            }
+    
+    def configurate(self, path=None, reaction='Ca48Ni64E140'):
+        if path is None:
+            path = pathlib.Path(DATABASE, 'e15190/microball/acceptance/config.dat')
+        with open(str(path), 'r') as f:
+            content = f.readlines()
+            for line in content[1:]:
+                if not reaction == line.split()[0]:
+                    continue
 
-    def draw_geometry(self, **kwargs):
-        fig, ax = plt.subplots(**kwargs)
-        cm = plt.cm.viridis(np.linspace(0.3, 1, len(self.config)))
+                ring = line.split()[1]
+                dets = list(map(int, line.split()[2:]))
+                self.configuration[ring] = dets
+                DET_MAX = 14
+                for det in [det for det in range(1, DET_MAX + 1) if not det in dets]:
+                    if (ring, det) in self.geometry.index:
+                        self.geometry.drop((ring, det))
+        
+        self.configurated = True
+        return self.geometry
 
-        for ir, ring in enumerate(self.config):
-            for det in self.config[ring]:
-                theta_min, theta_max = self.get_theta_range(ring, det)
-                phi_min, phi_max = self.get_phi_range(ring, det)
-                if phi_max > phi_min:
-                    box = plt.Rectangle(
-                        (phi_min, theta_min),
-                        phi_max - phi_min, theta_max - theta_min,
-                        fill=True,
-                        facecolor=cm[ir],
-                        edgecolor='k',
-                        linewidth=1,
-                    )
-                    ax.add_patch(box)
+                
+    def plot_coverage(self, cmap='viridis', **kwargs):
+        
+        figdict = dict(
+            figsize = (6,4),
+        )
+        figdict.update(kwargs)
+        
+        fig, ax = plt.subplots(**figdict)
+        cm = plt.get_cmap(cmap)(np.linspace(0.3, 1, len(self.geometry)))
 
-                    ax.text(
-                        phi_min + 0.5 * (phi_max - phi_min),
-                        theta_min + 0.5 * (theta_max - theta_min),
-                        f'R{ring}-{det:02d}',
-                        ha='center', va='center',
-                    )
-                else:
-                    box_a = plt.Rectangle(
-                        (phi_min, theta_min),
-                        360. - phi_min, theta_max - theta_min,
-                        fill=True,
-                        facecolor=cm[ir],
-                        edgecolor='k',
-                        linewidth=1,
-                    )
-                    box_b = plt.Rectangle(
-                        (0, theta_min),
-                        phi_max, theta_max - theta_min,
-                        fill=True,
-                        facecolor=cm[ir],
-                        edgecolor='k',
-                        linewidth=1,
-                    )
-                    ax.add_patch(box_a)
-                    ax.add_patch(box_b)
+        for ir, (index, row) in enumerate(self.geometry.iterrows()):
+            ring, det = index
+            x = row['phi_min']
+            y = row['theta_min']
+            dx = row['phi_max'] - x 
+            dy = row['theta_max'] - y
+            patch = plt.Rectangle(
+                (x, y), dx, dy, 
+                fill=True, alpha=0.6, edgecolor='k',
+                facecolor=cm[ir], linewidth=1
+            )
+            ax.add_patch(patch)
+            ax.text(
+                x + 0.5 * dx, 
+                y + 0.5 * dy, f'{ring}:{det}',
+                ha='center', va='center', 
+                fontdict={
+                    'size': 8, 
+                    'weight': 'roman', 
+                    'family' : 'serif', 
+                    'style' : 'normal',
+                } 
+            )
 
-                    # ax.text(
-                    #phi_min + 0.5 * (phi_max - phi_min),
-                    #theta_min + 0.5 * (theta_max - theta_min),
-                    # f'R{ring}-{det:02d}',
-                    # ha='center', va='center',
-                    # )
+        ax.set(title=r'E15190 $\mu$-ball coverage')
+        ax.set(xlabel=r'$\phi$ (deg.)', ylabel=r'$\theta$ (deg.)')
+        if self.coordinate == 'uball':
+            ax.set(xlim=(-30,360), ylim=(0,160))
+        elif self.coordinate == 'hira':
+            ax.set(xlim=(0,360), ylim=(0,160))
 
-        ax.set_title('Microball coverage in E15190-E14030')
-        ax.set_xlim(-20, 360)
-        ax.set_ylim(0, 180)
-        ax.set_xlabel(r'$\phi$ (deg)')
-        ax.set_ylabel(r'$\theta$ (deg)')
+        plt.tight_layout()
+
         return fig, ax
 
-    def impact_parameter_mapping(self, path=None):
+
+    def set_threshold(self, ring=2, path=None):
+        """
+        set_threshold(2, threshold_Sn_65mgcm2.dat)
+        set_threshold(3, threshold_Sn_58mgcm2.dat)
+        set_threshold(4, threshold_Sn_50mgcm2.dat)
+        set_threshold(5, threshold_Sn_43mgcm2.dat)
+        set_threshold(7, threshold_Sn_30mgcm2.dat)
+        set_threshold(8, threshold_Sn_23mgcm2.dat)
+        """
         if path is None:
-            path = pathlib.Path(
-                PROJECT_DIR, 'database/microball/bimp_mapping/Ca48Ni64E140.dat')
+            path = pathlib.Path(DATABASE, 'e15190/microball/acceptance/threshold_Sn_65mgcm2.dat')
+        
         df = pd.read_csv(str(path), delim_whitespace=True)
-        return df
+        df.columns = ['A', 'Z', 'threshold']
+        df.set_index(['A', 'Z'])
+        
+        for AZ, row in df.iterrows():
+            self.threshold[ring] = float(row[AZ]['threshold'])
+        
+        # here, do a fit to extend the data, to be done later.
 
-    def plot_impact_parameter_mapping(self, ax=None, path=None, **kwargs):
-        df = self.impact_parameter_mapping(path)
-        if ax is None:
-            ax = plt.gca()
-        kw = dict(
-            fmt='.'
-        )
-        kw.update(kwargs)
-        ax.errorbar(df['multiplicity'], df['b'], yerr=df['b_err'], **kw)
-        return ax
+        return
+
+    def get_threshold(self, ring, A, Z):
+        
+        if not ring in self.threshold:
+            raise ValueError('Not yet set up threshold data.')
+        
+        return self.threshold[ring][(A,Z)]
 
 
-if __name__ == '__main__':
+class MultiplicityMapping:
+    def __init__(self, path=None, reaction='Ca48Ni64E140'):
+        if path is None:
+            path = pathlib.Path(DATABASE, f'e15190/microball/bimp_mapping/{reaction}.dat')
+        
+        self.df = pd.read_csv(str(path), delim_whitespace=True).reset_index(drop=True)
+    
+    def MultiplicityToImpactParameter(self, m=5, y:Literal['b', 'bhat']='b'):
+        df = self.df.loc[self.df['multiplicity']==m]
+        return (df[y].values[0], df[f'{y}_err'].values[0])
 
-    uball = microball(
-        "../../database/microball//acceptance/uball_geometry.dat", 'uball')
-    # df = uball.geometry
-    # print(df)
-    # fig, ax = uball.draw_geometry(figsize=(10, 6))
-    # fig.savefig('uball_coverage_e15190.png')
-    fig, ax = plt.subplots()
-    uball.plot_impact_parameter_mapping(ax)
-    fig.savefig('impact_parameter_mapping.png')
