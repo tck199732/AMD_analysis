@@ -115,21 +115,3 @@ class AME:
     def get_symbol(self, N, Z):
         row = self.df.loc[((self.df['N'] == N) & (self.df['Z'] == Z))]
         return row['symbol'].values[0]
-
-
-if __name__ == '__main__':
-    ame = AME()
-    print(ame.get_mass('ca40'))
-    print(ame.get_mass('ca48'))
-    print(ame.get_mass('ni58'))
-    print(ame.get_mass('ni64'))
-    print(ame.get_mass('sn112'))
-    print(ame.get_mass('sn124'))
-
-    print(ame.get_mass('h1'))
-    print(ame.get_mass('li5'))
-    print(ame.get_mass('be8'))
-    print(ame.get_mass('h2'))
-    print(ame.get_mass('h3'))
-    print(ame.get_mass('he3'))
-    print(ame.get_mass('he4'))
