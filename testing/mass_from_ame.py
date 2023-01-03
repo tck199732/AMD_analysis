@@ -19,6 +19,7 @@ def main():
     mass_7Li = mass_table.get_mass('Li7')
     mass_6Li = mass_table.get_mass('Li6')
     mass_5Li = mass_table.get_mass('Li5')
+    mass_12C = mass_table.get_mass('C12')
     print(mass_n)
     print(mass_p)
     print(mass_d)
@@ -31,6 +32,7 @@ def main():
     # print(mass_7Li)
     # print(mass_7Be)
     # print(mass_8Be)
+    print(mass_12C)
 
 
 if __name__ == '__main__':

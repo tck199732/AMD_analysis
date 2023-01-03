@@ -1,21 +1,5 @@
-
-
-# Ignore all
-*
-
-# Unignore all with extensions
-!*.*
-
-# Unignore all dirs
-!*/
-
-#Unignore makefiles
-!**/Makefile
-!**/makefile
-
-
 # py env folder 
-**/env
+env_amd
 __pycache__/
 .ipynb_checkpoints/
 
@@ -34,18 +18,22 @@ __pycache__/
 **/*.mod
 **/*.smod
 
-
 # Result, Data, old files
-*/*.root
-**/data
+*.root
+data
 
 # temp files
-**/.directory
-**/*.log
-**/*.png
+.directory
+*.log
+
+# vscode setting
 .vscode
-# py env
-env_amd
+
+# results
 result
 ipynb
 scripts
+
+# executable 
+*.exe
+

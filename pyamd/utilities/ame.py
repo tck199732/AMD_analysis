@@ -9,6 +9,7 @@ from astropy import units, constants
 
 path_download = pathlib.Path(PROJECT_DIR, 'database/ame')
 
+
 class AME:
     def __init__(self, url=None, dl_path=None):
         if url is None:
@@ -118,5 +119,17 @@ class AME:
 
 if __name__ == '__main__':
     ame = AME()
-    print(ame.get_NZ('ca40'))
+    print(ame.get_mass('ca40'))
+    print(ame.get_mass('ca48'))
+    print(ame.get_mass('ni58'))
+    print(ame.get_mass('ni64'))
+    print(ame.get_mass('sn112'))
+    print(ame.get_mass('sn124'))
+
     print(ame.get_mass('h1'))
+    print(ame.get_mass('li5'))
+    print(ame.get_mass('be8'))
+    print(ame.get_mass('h2'))
+    print(ame.get_mass('h3'))
+    print(ame.get_mass('he3'))
+    print(ame.get_mass('he4'))
