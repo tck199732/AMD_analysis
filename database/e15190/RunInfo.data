@@ -1,0 +1,99 @@
+# This file is used to record the run No, geometry bad map version and also trigger condition.
+# There is total 3 kinds of trigger condition: uBallDS_uBallHira, uBallDS_uBallNW, uBallDS_uBallHira_uBallNW
+# The comment line should be ahead with "# " <- Attention of this space.
+
+# SystemTag     RunNo_Start   RunNo_End         GeoEff_BadMap           ShadowBar       TriggerCondition
+
+
+
+Ca48Ni64E140     4023           4032            V1                          0           uBallDS_uBallHira
+Ca48Ni64E140     4082           4123            V1                          0           uBallDS_uBallHira_uBallNW
+# Ca48Ni64E140     4224           4229            V1                          0           uBallDS_uBallNW
+# Ca48Ni64E140     4231           4240            V1                          0           uBallDS_uBallNW
+# Ca48Ni64E140     4242           4245            V1                          0           uBallDS_uBallNW
+# Ca48Ni64E140     4315           4327            V1                          0           uBallDS_uBallNW
+
+
+Ca48Ni64E56     4383            4399            V5                          0           uBallDS_uBallHira_uBallNW
+Ca48Ni64E56     4401            4414            V5                          0           uBallDS_uBallHira_uBallNW
+Ca48Ni64E56     4466            4493            V5                          0           uBallDS_uBallHira_uBallNW
+# Ca48Ni64E56     4543            4573            V5                          0           uBallDS_uBallNW
+Ca48Ni64E56     4642            4661            V5                          0           uBallDS_uBallHira_uBallNW
+  
+
+Ca40Ni58E140     2571           2586            V2                          0           uBallDS_uBallHira_uBallNW
+Ca40Ni58E140     2587           2588            V2.1                        0           uBallDS_uBallHira_uBallNW
+Ca40Ni58E140     2591           2601            V2.1                        0           uBallDS_uBallHira_uBallNW
+Ca40Ni58E140     2848           2851            V2                          0           uBallDS_uBallHira_uBallNW
+
+
+Ca40Ni58E56     2333            2354            V6                          0           uBallDS_uBallHira_uBallNW
+Ca40Ni58E56     2378            2390            V6                          0           uBallDS_uBallHira_uBallNW
+Ca40Ni58E56     2391            2394            V6                          0           uBallDS_uBallHira_uBallNW
+Ca40Ni58E56     2485            2489            V6                          0           uBallDS_uBallHira_uBallNW
+Ca40Ni58E56     2491            2495            V6                          0           uBallDS_uBallHira_uBallNW
+Ca40Ni58E56     2497            2502            V6                          0           uBallDS_uBallHira_uBallNW
+  
+
+Ca48Sn124E140     4007          4007            V3                          0           uBallDS_uBallHira_uBallNW
+Ca48Sn124E140     4042          4058            V3                          0           uBallDS_uBallHira_uBallNW
+Ca48Sn124E140     4060          4068            V3                          0           uBallDS_uBallHira_uBallNW
+# Ca48Sn124E140     4069         4074            V3                          0           uBallDS_uBallHira_uBallNW
+Ca48Sn124E140     4075          4078            V3                          0           uBallDS_uBallHira_uBallNW
+Ca48Sn124E140     4142          4150            V3                          0           uBallDS_uBallHira
+Ca48Sn124E140     4191          4192            V3                          0           uBallDS_uBallHira
+Ca48Sn124E140     4197          4201            V3                          0           uBallDS_uBallNW
+Ca48Sn124E140     4266          4300            V3                          0           uBallDS_uBallNW
+
+
+
+Ca48Sn124E56     4333           4334            V9                          0           uBallDS_uBallHira_uBallNW
+Ca48Sn124E56     4336           4380            V9                          0           uBallDS_uBallHira_uBallNW
+Ca48Sn124E56     4621           4640            V9                          0           uBallDS_uBallHira_uBallNW
+
+  
+
+Ca40Sn112E140     2614          2621            V4                          0           uBallDS_uBallHira_uBallNW
+Ca40Sn112E140     2830          2846            V4                          0           uBallDS_uBallHira_uBallNW
+
+
+
+Ca40Sn112E56     2315           2316            V8                          0           uBallDS_uBallHira_uBallNW
+Ca40Sn112E56     2317           2331            V8                          0           uBallDS_uBallHira_uBallNW
+Ca40Sn112E56     2357           2376            V8                          0           uBallDS_uBallHira_uBallNW
+
+  
+
+Ca48Ni58E140     4136           4141            V12                         0           uBallDS_uBallHira
+Ca48Ni58E140     4212           4219            V12                         0           uBallDS_uBallHira_uBallNW
+Ca48Ni58E140     4255           4261            V12                         0           uBallDS_uBallNW
+Ca48Ni58E140     4262           4263            V12                         0           uBallDS_uBallNW
+Ca48Ni58E140     4264           4264            V12                         0           uBallDS_uBallNW
+Ca48Ni58E140     4308           4313            V12                         0           uBallDS_uBallNW
+
+
+Ca48Ni58E56     4495            4509            V11                         0           uBallDS_uBallHira_uBallNW
+Ca48Ni58E56     4607            4619            V11                         0           uBallDS_uBallHira_uBallNW
+  
+
+Ca40Ni64E140     2723           2735            V16                         0           uBallDS_uBallHira_uBallNW
+
+
+Ca40Ni64E56     2512            2523            V15                         0           uBallDS_uBallHira_uBallNW
+
+Ca48Sn112E140     4125          4127            V7                          0           uBallDS_uBallHira_uBallNW
+Ca48Sn112E140     4128          4132            V7                          0           uBallDS_uBallHira
+Ca48Sn112E140     4203          4209            V7                          0           uBallDS_uBallHira_uBallNW
+Ca48Sn112E140     4247          4253            V7                          0           uBallDS_uBallNW
+Ca48Sn112E140     4302          4306            V7                          0           uBallDS_uBallNW
+
+
+Ca48Sn112E56     4448           4464            V10                         0           uBallDS_uBallHira_uBallNW
+Ca48Sn112E56     4593           4604            V10                         0           uBallDS_uBallHira_uBallNW
+  
+
+Ca40Sn124E140     2710          2713            V14                         0           uBallDS_uBallNW
+Ca40Sn124E140     2714          2721            V14                         0           uBallDS_uBallHira_uBallNW
+
+
+Ca40Sn124E56     2529           2545            V13                         0           uBallDS_uBallHira_uBallNW

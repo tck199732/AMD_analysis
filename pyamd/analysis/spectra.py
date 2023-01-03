@@ -1,6 +1,6 @@
 from pyamd import PROJECT_DIR
 from pyamd.e15190 import e15190
-from pyamd.utilities import root6, helper
+from pyamd.utilities import root6, dataframe
 import pathlib
 import os
 import pandas as pd
@@ -12,7 +12,7 @@ import random
 from datetime import datetime
 random.seed(datetime.now().timestamp())
 
-plot_helper = helper.DataFrameHelper()
+df_helper = dataframe.DataFrameHelper()
 hist_reader = root6.HistogramReader()
 
 
@@ -183,16 +183,16 @@ class PtRapidityLAB:
 
     def plotPtRapidity(self, ax=None, range=[[0., 1.], [0., 600.]], bins=[100, 600], **kwargs):
         df = self.df.copy()
-        return plot_helper.plot2d(ax, df, range=range, bins=bins, **kwargs)
+        return df_helper.plot2d(ax, df, range=range, bins=bins, **kwargs)
 
     def plotPtSpectrum(self, ax=None, xrange=(0.4, 0.6), yrange=(0, 600), bins=30, correct_coverage=False, correct_range=(0., 600), **kwargs):
         df = self.PtSpectrum(xrange=xrange, yrange=yrange,
                              bins=bins, correct_coverage=correct_coverage, correct_range=correct_range)
-        return plot_helper.plot1d(ax, df, **kwargs)
+        return df_helper.plot1d(ax, df, **kwargs)
 
     def plotRapidityCMS(self, ax=None, range=(-0.5, 0.5), bins=100, **kwargs):
         df = self.RapidityCMS(range=range, bins=bins)
-        return plot_helper.plot1d(ax, df, **kwargs)
+        return df_helper.plot1d(ax, df, **kwargs)
 
     def EkinThetaCMS(self, xrange=(0.4, 0.6), yrange=(0., 600.), correct_coverage=False):
         df = self.correct_coverage(xrange=xrange, yrange=yrange) if correct_coverage else self.query(
@@ -342,15 +342,15 @@ class EkinThetaCMS:
 
     def plotEkinCMS(self, ax=None, range=(0, 200), bins=50, **kwargs):
         df = self.EkinCMS(xrange=range, bins=bins)
-        return plot_helper.plot1d(ax, df, **kwargs)
+        return df_helper.plot1d(ax, df, **kwargs)
 
     def plotThetaCMS(self, ax=None, range=(40, 140), bins=100, **kwargs):
         df = self.ThetaCMS(yrange=range, bins=bins)
-        return plot_helper.plot1d(ax, df, **kwargs)
+        return df_helper.plot1d(ax, df, **kwargs)
 
     def plotEkinThetaCMS(self, ax=None, range=[[0, 200], [40, 140]], bins=[50, 100], **kwargs):
         df = self.query(xrange=range[0], yrange=range[1])
-        return plot_helper.plot2d(ax, df, range=range, bins=bins, **kwargs)
+        return df_helper.plot2d(ax, df, range=range, bins=bins, **kwargs)
 
 
 if __name__ == '__main__':

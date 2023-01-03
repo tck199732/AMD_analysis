@@ -1,27 +1,9 @@
-
 import re
 import numpy as np
 from astropy import units, constants
 
 from pyamd.utilities import ame
 ame_table = ame.AME()
-
-# class particle:
-#     PARTICLES = ['n', 'p', 'd', 't', '3He', '4He']
-#     ZID = [0, 1, 1, 1, 2, 2]
-#     NID = [1, 0, 1, 2, 1, 2]
-
-#     def __init__(self, name):
-#         if name == 'coal_p':
-#             name = 'p'
-#         elif name == 'coal_n':
-#             name = 'n'
-#         elif not name in self.PARTICLES:
-#             raise ValueError('input particle is not analyzed in experiment.')
-#         self.name = name
-#         self.Z = self.ZID[self.PARTICLES.index(name)]
-#         self.N = self.NID[self.PARTICLES.index(name)]
-
 
 class particle:
     NZ = {
@@ -44,17 +26,6 @@ class particle:
 
 
 class reaction:
-    # mass_1u = 931.49410242
-    # beam_mass = {
-    #     'Ca40': 39.962590866,
-    #     'Ca48': 47.95252290
-    # }
-    # target_mass = {
-    #     'Ni58': 57.935343,
-    #     'Ni64': 63.9279660,
-    #     'Sn112': 111.904818,
-    #     'Sn124': 123.9052739
-    # }
 
     def __init__(self, reaction):
         self.beamA, self.targetA, beam_energy = [
@@ -63,11 +34,6 @@ class reaction:
             m for m in re.compile('[A-Za-z]{2}').findall(reaction)]
 
         self.beam_energy = beam_energy * units.MeV
-
-        # self.beam_mass = (
-        #     self.beam_mass[f'{self.beam}{self.beamA}']) * self.mass_1u
-        # self.target_mass = (
-        #     self.target_mass[f'{self.target}{self.targetA}']) * self.mass_1u
 
         beam = f'{self.beam}{self.beamA}'
         target = f'{self.target}{self.targetA}'
