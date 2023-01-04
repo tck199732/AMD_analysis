@@ -1,160 +1,100 @@
-
-#include "spectra.hh"
-#include <chrono>
-struct manager
+#include "anal.hh"
+struct Event
 {
-    std::string reaction;
-    fs::path path_data21;
-    fs::path path_data3;
-    fs::path path_out;
-    int Ncmin, Ncmax;
-    double bmin, bmax;
-    system_info *sys_info;
-    double betacms, rapidity_beam;
+    int multi;
+    double bimp;
+    std::vector<particle> particles;
+};
 
-    RootReader *reader21;
-    RootReader *reader3;
-    histograms hist21;
-    histograms hist3;
-    histograms hist3_ndecay1;
-    eventcut event_cut;
-    TFile *outputfile;
+struct EventCut
+{
+    std::array<int, 2> Nccut;
+    std::array<double, 2> bcut;
+    bool pass(const Event &event)
+    {
+        return (event.multi >= this->Nccut[0] && event.multi <= this->Nccut[1] && event.bimp >= this->bcut[0] && event.bimp < this->bcut[1]);
+    }
+};
 
-    int nevents21, nevents3;
-    std::chrono::duration<double> timer21, timer3;
+struct Histograms
+{
+    std::string mode;
+    std::vector<std::string> particlenames = {
+        "n", "p", "d", "t", "3He", "4He", "coal_n", "coal_p"};
+
+    double norm = 0.0;
+    std::map<std::string, TH2D *> h2_pta_rapidity_lab;
     void init();
-    void read();
-    void replace_error();
-    void finish();
+    void fill(const particle &particle, const double &weight);
+    void fill(const Event &event, const double &weight);
+    void normalize();
+    void write();
 };
 
 int main(int argc, char *argv[])
 {
+    // passe args
     std::string reaction = argv[1];
-    std::string path_data21 = argv[2];
-    std::string path_data3 = argv[3];
-    std::string path_out = argv[4];
-    int Ncmin = 1;
-    int Ncmax = 25;
-    double bmin = 0.0;
-    double bmax = 3.0;
-    if (argc >= 6)
+    std::string output_pth = argv[2];
+
+    int nfiles_input = std::stoi(argv[3]);
+    std::vector<std::string> input_pths21;
+    std::vector<std::string> input_pths3;
+
+    int narg = 4;
+    for (int _ = 0; _ < nfiles_input; _++)
     {
-        Ncmin = std::stoi(argv[5]);
+        input_pths21.push_back(argv[narg]);
+        narg++;
     }
-    if (argc >= 7)
+    for (int _ = 0; _ < nfiles_input; _++)
     {
-        Ncmax = std::stoi(argv[6]);
-    }
-    if (argc >= 8)
-    {
-        bmin = std::stod(argv[7]);
-    }
-    if (argc >= 9)
-    {
-        bmax = std::stod(argv[8]);
+        input_pths3.push_back(argv[narg]);
+        narg++;
     }
 
-    manager manager = {reaction, path_data21, path_data3, path_out, Ncmin, Ncmax, bmin, bmax};
-    manager.init();
-    manager.read();
-    manager.replace_error();
-    manager.finish();
-    return 0;
-}
+    // read args for event cut
+    int Ncmin = std::stoi(argv[narg]);
+    int Ncmax = std::stoi(argv[narg++]);
+    double bmin = std::stod(argv[narg++]);
+    double bmax = std::stod(argv[narg++]);
 
-void manager::init()
-{
-    if (!fs::exists(this->path_data21))
-    {
-        throw std::invalid_argument("path_data21 does not exist.");
-    }
-    if (!fs::exists(this->path_data3))
-    {
-        throw std::invalid_argument("path_data3 does not exist.");
-    }
+    // initialize Tchains and other structures
+    TChain *chain21 = new TChain("AMD");
+    TChain *chain3 = new TChain("AMD");
+    Initialize_TChain(chain21, input_pths21, "filtered", "21");
+    Initialize_TChain(chain3, input_pths3, "filtered", "3");
 
-    std::vector<branch> branches = {
-        {"Nc", "int"},
-        {"multi", "int"},
-        {"b", "double"},
-        {"px", "double[multi]"},
-        {"py", "double[multi]"},
-        {"pz", "double[multi]"},
-        {"N", "int[multi]"},
-        {"Z", "int[multi]"},
-    };
+    Histograms histograms21 = {"21"};
+    Histograms histograms3 = {"3"};
+    Histograms histograms3_single_decay = {"3-single-decay"};
+    histograms21.init();
+    histograms3.init();
+    histograms3_single_decay.init();
 
-    for (auto &br : branches)
-    {
-        br.autofill();
-    }
+    system_info *ReactionInfo = new system_info();
+    double betacms = ReactionInfo->get_betacms(reaction);
+    double beam_rapidity = ReactionInfo->get_rapidity_beam(reaction);
 
-    this->reader21 = new RootReader("AMD");
-    reader21->add_file(fs::absolute(this->path_data21));
-    reader21->set_branches(branches);
-    this->reader3 = new RootReader("AMD");
-    reader3->add_file(fs::absolute(this->path_data3));
-    reader3->set_branches(branches);
+    EventCut event_cut = {{Ncmin, Ncmax}, {bmin, bmax}};
 
-    this->sys_info = new system_info();
-    this->betacms = sys_info->get_betacms(this->reaction);
-    this->rapidity_beam = sys_info->get_rapidity_beam(this->reaction);
+    // counter of weights of each primary event
+    int nevents21 = chain21->GetEntries();
+    int nevents3 = chain3->GetEntries();
+    std::vector<double> weights(nevents21, 0.);
 
-    this->event_cut = {{this->Ncmin, this->Ncmax}, {this->bmin, this->bmax}};
-
-    this->hist21 = {this->reaction, "prim", this->betacms, this->rapidity_beam};
-    this->hist3 = {this->reaction, "seq", this->betacms, this->rapidity_beam};
-    this->hist3_ndecay1 = {this->reaction, "seq1", this->betacms, this->rapidity_beam};
-
-    this->hist21.init();
-    this->hist3.init();
-    this->hist3_ndecay1.init();
-    this->nevents21 = this->reader21->tree->GetEntries();
-    this->nevents3 = this->reader3->tree->GetEntries();
-    std::cout << "number of events = " << nevents21 << std::endl;
-}
-
-void manager::read()
-{
-    int Nc, multi;
-    double bimp;
-    int *fz;
-    int *fn;
-    double *px;
-    double *py;
-    double *pz;
-
-    int ndecays = this->nevents3 / this->nevents21;
-    std::vector<double> weights(this->nevents21, 0.);
     auto start3 = std::chrono::steady_clock::now();
-    for (int ievt3 = 0; ievt3 < this->nevents3; ievt3++)
+    for (int ievt3 = 0; ievt3 < nevents3; ievt3++)
     {
+        chain3->GetEntry(ievt3);
 
-        std::map<std::string, std::any> map = this->reader3->get_entry(ievt3);
-        try
+        Event event3 = {DATASTRUCT.Nc, DATASTRUCT.b};
+        if (event_cut.pass(event3))
         {
-            Nc = std::any_cast<int>(map["Nc"]);
-            bimp = std::any_cast<double>(map["b"]);
-            multi = std::any_cast<int>(map["multi"]);
-            fn = std::any_cast<int *>(map["N"]);
-            fz = std::any_cast<int *>(map["Z"]);
-            px = std::any_cast<double *>(map["px"]);
-            py = std::any_cast<double *>(map["py"]);
-            pz = std::any_cast<double *>(map["pz"]);
-        }
-
-        catch (const std::bad_any_cast &e)
-        {
-            std::cout << e.what() << '\n';
-        }
-        event event3 = {Nc, bimp};
-        if (this->event_cut.pass(event3))
-        {
-            this->hist3.norm += 1. / ndecays;
-            if (ievt3 < nevents3 / ndecays)
+            histograms3.norm += 1. / NDECAYS;
+            if (ievt3 < nevents3 / NDECAYS)
             {
-                this->hist3_ndecay1.norm += 1.;
+                histograms3_single_decay.norm += 1.;
             }
         }
         else
@@ -163,88 +103,118 @@ void manager::read()
         }
         weights[ievt3 % nevents21] += 1.;
 
-        for (unsigned int i = 0; i < multi; i++)
+        for (unsigned int i = 0; i < event3.multi; i++)
         {
-            particle particle = {fn[i], fz[i], px[i], py[i], pz[i]};
-            particle.autofill(this->betacms);
-            if (ievt3 < nevents3 / ndecays)
+            particle particle = {DATASTRUCT.N[i], DATASTRUCT.Z[i], DATASTRUCT.px[i], DATASTRUCT.py[i], DATASTRUCT.pz[i]};
+            particle.autofill(betacms, beam_rapidity);
+
+            if (ievt3 < nevents3 / NDECAYS)
             {
-                this->hist3_ndecay1.fill(particle, 1.);
+                histograms3_single_decay.fill(particle, 1.);
             }
-            this->hist3.fill(particle, 1. / ndecays);
+            histograms3.fill(particle, 1. / NDECAYS);
         }
     }
     auto end3 = std::chrono::steady_clock::now();
-    this->timer3 = end3 - start3;
+    std::chrono::duration<double> timer3 = end3 - start3;
 
     auto start21 = std::chrono::steady_clock::now();
     for (int ievt21 = 0; ievt21 < nevents21; ievt21++)
     {
-        weights[ievt21] /= 1.0 * ndecays;
-        std::map<std::string, std::any> map = this->reader21->get_entry(ievt21);
-        try
+        chain21->GetEntry(ievt21);
+        weights[ievt21] /= 1.0 * NDECAYS;
+
+        Event event21 = {DATASTRUCT.Nc, DATASTRUCT.b};
+
+        for (unsigned int i = 0; i < event21.multi; i++)
         {
-            Nc = std::any_cast<int>(map["Nc"]);
-            bimp = std::any_cast<double>(map["b"]);
-            multi = std::any_cast<int>(map["multi"]);
-            fn = std::any_cast<int *>(map["N"]);
-            fz = std::any_cast<int *>(map["Z"]);
-            px = std::any_cast<double *>(map["px"]);
-            py = std::any_cast<double *>(map["py"]);
-            pz = std::any_cast<double *>(map["pz"]);
+            particle particle = {DATASTRUCT.N[i], DATASTRUCT.Z[i], DATASTRUCT.px[i], DATASTRUCT.py[i], DATASTRUCT.pz[i]};
+            particle.autofill(betacms, beam_rapidity);
+            histograms21.fill(particle, weights[ievt21]);
         }
 
-        catch (const std::bad_any_cast &e)
-        {
-            std::cout << e.what() << '\n';
-        }
-
-        event event21 = {Nc, bimp};
-        // if (!this->event_cut.pass(event21))
-        // {
-        //     continue;
-        // }
-
-        for (unsigned int i = 0; i < multi; i++)
-        {
-            particle particle = {fn[i], fz[i], px[i], py[i], pz[i]};
-            particle.autofill(this->betacms);
-            this->hist21.fill(particle, weights[ievt21]);
-        }
-
-        this->hist21.norm += weights[ievt21];
+        histograms21.norm += weights[ievt21];
     }
     auto end21 = std::chrono::steady_clock::now();
-    this->timer21 = end21 - start21;
-}
+    std::chrono::duration<double> timer21 = end21 - start21;
 
-void manager::replace_error()
-{
-    for (auto &[pn, h2] : this->hist3.h2_pta_rapidity_lab)
+    // error correction for sampling 10 decay events
+    for (auto &[pn, h2] : histograms3.h2_pta_rapidity_lab)
     {
         for (int i = 0; i < h2->GetNbinsX(); i++)
         {
             for (int j = 0; j < h2->GetNbinsY(); j++)
             {
-                double error = this->hist3_ndecay1.h2_pta_rapidity_lab[pn]->GetBinError(i + 1, j + 1);
+                double error = histograms3_single_decay.h2_pta_rapidity_lab[pn]->GetBinError(i + 1, j + 1);
                 h2->SetBinError(i + 1, j + 1, error);
             }
         }
     }
+
+    // saving results
+    TFile *outputfile = new TFile(output_pth.c_str(), "RECREATE");
+    outputfile->cd();
+    histograms21.normalize();
+    histograms3.normalize();
+    histograms3_single_decay.normalize();
+    histograms21.write();
+    histograms3.write();
+    histograms3_single_decay.write();
+    outputfile->Write();
+    std::cout << "Elapsed Time reading table3 : " << timer3.count() << std::endl;
+    std::cout << "Elapsed Time reading table21 : " << timer21.count() << std::endl;
 }
 
-void manager::finish()
+void Histograms::init()
 {
-    this->outputfile = new TFile(this->path_out.c_str(), "RECREATE");
-    this->outputfile->cd();
-    this->hist21.normalize();
-    this->hist3.normalize();
-    this->hist3_ndecay1.normalize();
-    this->hist21.write();
-    this->hist3.write();
-    this->hist3_ndecay1.write();
-    this->outputfile->Write();
-    std::cout << "Elapsed Time reading table3 : " << this->timer3.count() << std::endl;
-    std::cout << "Elapsed Time reading table21 : " << this->timer21.count() << std::endl;
-    std::cout << "DONE" << std::endl;
+    for (const auto &pn : this->particlenames)
+    {
+        std::string hname = "h2_pta_rapidity_lab_" + this->mode + "_" + pn;
+        this->h2_pta_rapidity_lab[pn] = new TH2D(hname.c_str(), "", 100, 0., 1., 600, 0, 600);
+        this->h2_pta_rapidity_lab[pn]->Sumw2();
+        this->h2_pta_rapidity_lab[pn]->SetDirectory(0);
+    }
+}
+
+void Histograms::write()
+{
+    for (const auto &pn : this->particlenames)
+    {
+        this->h2_pta_rapidity_lab[pn]->Write();
+    }
+}
+
+void Histograms::normalize()
+{
+    std::cout << "normalizing Histograms : " << this->norm << std::endl;
+    for (const auto &pn : this->particlenames)
+    {
+        this->h2_pta_rapidity_lab[pn]->Scale(1. / this->norm);
+    }
+}
+
+void Histograms::fill(const particle &particle, const double &weight)
+{
+    if (this->h2_pta_rapidity_lab.count(particle.name) == 1)
+    {
+        this->h2_pta_rapidity_lab[particle.name]->Fill(particle.rapidity_lab_normed, particle.pt, weight);
+    }
+
+    if (h2_pta_rapidity_lab.count("coal_p") == 1)
+    {
+        this->h2_pta_rapidity_lab["coal_p"]->Fill(particle.rapidity_lab_normed, particle.pt, weight * particle.zid);
+    }
+    if (h2_pta_rapidity_lab.count("coal_n") == 1)
+    {
+        this->h2_pta_rapidity_lab["coal_n"]->Fill(particle.rapidity_lab_normed, particle.pt, weight * particle.nid);
+    }
+    return;
+}
+
+void Histograms::fill(const Event &event, const double &weight)
+{
+    for (const auto &par : event.particles)
+    {
+        this->fill(par, weight);
+    }
 }
