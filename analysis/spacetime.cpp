@@ -1,142 +1,114 @@
 
-#include "spacetime.hh"
+#include "anal.hh"
 #include <chrono>
-struct manager
+
+struct Histograms
 {
-    std::string reaction;
-    fs::path path_data;
-    fs::path path_out;
-    system_info *sys_info;
-    double betacms, rapidity_beam;
+    std::vector<std::string> particlenames = {
+        "n", "p", "d", "t", "3He", "4He"};
 
-    RootReader *reader;
-    histograms hist;
-    TFile *outputfile;
-
-    int nevents;
-    std::chrono::duration<double> timer;
+    std::map<std::string, TH2D *> h2_time_momentum;
+    std::map<std::string, TH2D *> h2_time_position;
     void init();
-    void read();
-    void finish();
+    void fill(const particle &particle, const double &weight);
+    void normalize(const double &norm);
+    void write();
 };
+
+void Histograms::init()
+{
+    for (const auto &pn : this->particlenames)
+    {
+        this->h2_time_momentum[pn] = new TH2D(("h2_time_momentum_" + pn).c_str(), "", 600, 0., 600., 500, 0, 500);
+        this->h2_time_position[pn] = new TH2D(("h2_time_position_" + pn).c_str(), "", 400, 0., 40., 500, 0, 500);
+
+        this->h2_time_position[pn]->Sumw2();
+        this->h2_time_position[pn]->SetDirectory(0);
+        this->h2_time_momentum[pn]->Sumw2();
+        this->h2_time_momentum[pn]->SetDirectory(0);
+    }
+}
+
+void Histograms::write()
+{
+    for (const auto &pn : this->particlenames)
+    {
+        this->h2_time_momentum[pn]->Write();
+        this->h2_time_position[pn]->Write();
+    }
+}
+
+void Histograms::normalize(const double &norm)
+{
+    for (const auto &pn : this->particlenames)
+    {
+        this->h2_time_momentum[pn]->Scale(1. / norm);
+        this->h2_time_position[pn]->Scale(1. / norm);
+    }
+}
+
+void Histograms::fill(const particle &particle, const double &weight)
+{
+    if (this->h2_time_momentum.count(particle.name) == 1)
+    {
+        this->h2_time_momentum[particle.name]->Fill(particle.pcms, particle.t, 1.);
+        this->h2_time_position[particle.name]->Fill(particle.r, particle.t, 1.);
+    }
+    return;
+}
 
 int main(int argc, char *argv[])
 {
+    // parse args
     std::string reaction = argv[1];
-    std::string path_data = argv[2];
-    std::string path_out = argv[3];
+    std::string output_pth = argv[2];
 
-    manager manager = {reaction, path_data, path_out};
-    manager.init();
-    manager.read();
-    manager.finish();
-    return 0;
-}
-
-void manager::init()
-{
-    if (!fs::exists(this->path_data))
+    std::vector<std::string> input_pths;
+    for (int i = 3; i < argc; i++)
     {
-        throw std::invalid_argument("path_data does not exist.");
+        input_pths.push_back(argv[i]);
     }
 
-    std::vector<branch> branches = {
-        {"multi", "int"},
-        {"b", "double"},
-        {"px", "double[multi]"},
-        {"py", "double[multi]"},
-        {"pz", "double[multi]"},
-        {"N", "int[multi]"},
-        {"Z", "int[multi]"},
-        {"x", "double[multi]"},
-        {"y", "double[multi]"},
-        {"z", "double[multi]"},
-        {"t", "double[multi]"},
-    };
+    // initialize TChain and structures
+    TChain *chain = new TChain("AMD");
+    Initialize_TChain(chain, input_pths, "default", "21t");
 
-    for (auto &br : branches)
+    Histograms histograms;
+    histograms.init();
+
+    system_info *ReactionInfo = new system_info();
+    double betacms = ReactionInfo->get_betacms(reaction);
+    double beam_rapidity = ReactionInfo->get_rapidity_beam(reaction);
+
+    // count the number particles with emission time <= 0. (tested all are 0 not negative);
+    long count_neg_time = 0;
+
+    // main anal
+    for (int ievt = 0; ievt < chain->GetEntries(); ievt++)
     {
-        br.autofill();
-    }
+        chain->GetEntry(ievt);
 
-    this->reader = new RootReader("AMD");
-    reader->add_file(fs::absolute(this->path_data));
-    reader->set_branches(branches);
-
-    this->sys_info = new system_info();
-    this->betacms = sys_info->get_betacms(this->reaction);
-    this->rapidity_beam = sys_info->get_rapidity_beam(this->reaction);
-
-    this->hist = {this->reaction, this->betacms, this->rapidity_beam};
-
-    this->hist.init();
-    this->nevents = this->reader->tree->GetEntries();
-    std::cout << "number of events = " << nevents << std::endl;
-}
-
-void manager::read()
-{
-    double count_neg_time = 0.;
-
-    int multi;
-    double bimp;
-    int *fz;
-    int *fn;
-    double *px;
-    double *py;
-    double *pz;
-    double *x;
-    double *y;
-    double *z;
-    double *t;
-
-    for (int ievt = 0; ievt < nevents; ievt++)
-    {
-        std::map<std::string, std::any> map = this->reader->get_entry(ievt);
-        try
+        for (unsigned int i = 0; i < DATASTRUCT.multi; i++)
         {
-            bimp = std::any_cast<double>(map["b"]);
-            multi = std::any_cast<int>(map["multi"]);
-            fn = std::any_cast<int *>(map["N"]);
-            fz = std::any_cast<int *>(map["Z"]);
-            px = std::any_cast<double *>(map["px"]);
-            py = std::any_cast<double *>(map["py"]);
-            pz = std::any_cast<double *>(map["pz"]);
-            x = std::any_cast<double *>(map["x"]);
-            y = std::any_cast<double *>(map["y"]);
-            z = std::any_cast<double *>(map["z"]);
-            t = std::any_cast<double *>(map["t"]);
-        }
-
-        catch (const std::bad_any_cast &e)
-        {
-            std::cout << e.what() << '\n';
-        }
-
-        for (unsigned int i = 0; i < multi; i++)
-        {
-            particle particle = {fn[i], fz[i], px[i], py[i], pz[i]};
-            particle.set_xyzt(x[i], y[i], z[i], t[i]);
-            particle.autofill(this->betacms);
+            particle particle = {DATASTRUCT.N[i], DATASTRUCT.Z[i], DATASTRUCT.px[i], DATASTRUCT.py[i], DATASTRUCT.pz[i]};
+            particle.set_xyzt(DATASTRUCT.x[i], DATASTRUCT.y[i], DATASTRUCT.z[i], DATASTRUCT.t[i]);
+            particle.autofill(betacms);
 
             if (particle.t <= 0.0)
             {
-                count_neg_time += 1.;
+                count_neg_time += 1;
                 continue;
             }
-            this->hist.fill(particle, 1.);
+            histograms.fill(particle, 1.);
         }
-
-        this->hist.norm += 1.;
     }
-    std::cout << "number fo unphysical emission time : " << count_neg_time << std::endl;
-}
+    histograms.normalize(1. / chain->GetEntries());
 
-void manager::finish()
-{
-    this->outputfile = new TFile(this->path_out.c_str(), "RECREATE");
-    this->outputfile->cd();
-    this->hist.normalize();
-    this->hist.write();
-    this->outputfile->Write();
+    std::cout << "number fo unphysical emission time : " << count_neg_time << std::endl;
+
+    // saving result
+    TFile *outputfile = new TFile(output_pth.c_str(), "RECREATE");
+    outputfile->cd();
+    histograms.write();
+    outputfile->Write();
 }

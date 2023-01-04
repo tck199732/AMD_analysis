@@ -1,193 +1,100 @@
-#include "TFile.h"
-#include "TH2D.h"
-
-#include <iostream>
-#include <map>
-#include <vector>
-#include <string>
-
-#include "../src/particle.cpp"
-#include "../src/root_io.cpp"
-#include "../src/system_info.cpp"
-
-const int ndecays = 10;
-struct event
+#include "anal.hh"
+struct Event
 {
-    int Nc;
+    int multi;
     double bimp;
     std::vector<particle> particles;
 };
 
-struct histograms
+struct EventCut
 {
-    std::string reaction, mode;
-    double norm = 0.;
-    TH2D *h2_multi_b;
+    std::array<int, 2> Nccut;
+    std::array<double, 2> bcut;
+    bool pass(const Event &event);
+};
 
+bool EventCut::pass(const Event &event)
+{
+    return (event.multi >= this->Nccut[0] && event.multi <= this->Nccut[1] && event.bimp >= this->bcut[0] && event.bimp < this->bcut[1]);
+}
+
+struct Histograms
+{
+    TH2D *h2_multi_b;
     void init();
-    void fill(const event &event);
-    void normalize();
+    void fill(const Event &event, const double &weight = 1.);
+    void normalize(const double &norm);
     void write();
 };
 
-void histograms::init()
+void Histograms::init()
 {
-    this->h2_multi_b = new TH2D(("h2_multi_b_mode" + this->mode).c_str(), "", 80, -0.5, 80.5, 1000, 0., 10.);
+    this->h2_multi_b = new TH2D("h2_multi_b", "", 80, -0.5, 80.5, 1000, 0., 10.);
     this->h2_multi_b->Sumw2();
     this->h2_multi_b->SetDirectory(0);
 }
-void histograms::write()
+void Histograms::write()
 {
     this->h2_multi_b->Write();
 }
 
-void histograms::fill(const event &event)
+void Histograms::fill(const Event &event, const double &weight)
 {
-    double weight = 1.;
-    if (this->mode == "3")
-    {
-        weight = 1. / ndecays;
-    }
-    this->h2_multi_b->Fill(event.Nc, event.bimp, weight);
-    this->norm += 1.;
+    this->h2_multi_b->Fill(event.multi, event.bimp, weight);
 }
 
-void histograms::normalize()
+void Histograms::normalize(const double &norm)
 {
-    if (this->mode == "3")
-    {
-        this->norm /= ndecays;
-    }
-    this->h2_multi_b->Scale(1. / this->norm);
+    this->h2_multi_b->Scale(1. / norm);
 }
-struct manager
-{
-    std::string reaction, mode;
-    fs::path path_data;
-    fs::path path_out;
-
-    system_info *sys_info;
-    double betacms, rapidity_beam;
-
-    RootReader *reader;
-    histograms hist;
-    TFile *outputfile;
-
-    void init();
-    void read();
-    void fill(const event &event);
-    void finish();
-};
 
 int main(int argc, char *argv[])
 {
-    std::string reaction = argv[1];
-    std::string mode = argv[2];
-    std::string path_data = argv[3];
-    std::string path_out = argv[4];
-    manager manager = {reaction, mode, path_data, path_out};
-    manager.init();
-    manager.read();
-    manager.finish();
-}
+    // parse args
+    std::string analysis = argv[1]; // default or filtered
+    std::string reaction = argv[2];
+    std::string mode = argv[3];
+    std::string output_pth = argv[4];
 
-void manager::init()
-{
-    if (!fs::exists(this->path_data))
+    std::vector<std::string> input_pths;
+
+    for (int i = 5; i < argc; i++)
     {
-        throw std::invalid_argument("path_data does not exist.");
+        input_pths.push_back(argv[i]);
     }
 
-    std::vector<branch> branches = {
-        {"Nc", "int"},
-        {"multi", "int"},
-        {"b", "double"},
-        {"px", "double[multi]"},
-        {"py", "double[multi]"},
-        {"pz", "double[multi]"},
-        {"N", "int[multi]"},
-        {"Z", "int[multi]"},
-    };
+    // set up TChain and the data structure
+    TChain *chain = new TChain("AMD");
+    Initialize_TChain(chain, input_pths, analysis, mode);
 
-    for (auto &br : branches)
+    // set up histogram and event cut
+    Histograms histograms;
+    histograms.init();
+    EventCut event_cut = {{1, 100}, {0., 10.}};
+
+    // counter and weight of histogram
+    int event_counter = 0;
+    double weight = mode == "3" ? 1. / NDECAYS : 1.;
+
+    // main analysis
+    for (int ievt = 0; ievt < chain->GetEntries(); ievt++)
     {
-        br.autofill();
-    }
+        chain->GetEntry(ievt);
 
-    this->reader = new RootReader("AMD");
-    reader->add_file(fs::absolute(this->path_data));
-    reader->set_branches(branches);
-
-    this->sys_info = new system_info();
-    this->betacms = sys_info->get_betacms(this->reaction);
-    this->rapidity_beam = sys_info->get_rapidity_beam(this->reaction);
-
-    this->hist = {this->reaction, this->mode};
-    this->hist.init();
-}
-
-void manager::read()
-{
-    int nevents = this->reader->tree->GetEntries();
-    std::cout << "number of events = " << nevents << std::endl;
-
-    int Nc;
-    int multi;
-    double bimp;
-    int *fz;
-    int *fn;
-    double *px;
-    double *py;
-    double *pz;
-
-    std::vector<particle> particles;
-    for (int ievt = 0; ievt < nevents; ievt++)
-    {
-        std::map<std::string, std::any> map = this->reader->get_entry(ievt);
-        try
+        int multi = analysis == "default" ? DATASTRUCT.multi : DATASTRUCT.Nc;
+        Event event = {multi, DATASTRUCT.b};
+        if (event_cut.pass(event))
         {
-            Nc = std::any_cast<int>(map["Nc"]);
-            multi = std::any_cast<int>(map["multi"]);
-            bimp = std::any_cast<double>(map["b"]);
-            fn = std::any_cast<int *>(map["N"]);
-            fz = std::any_cast<int *>(map["Z"]);
-            px = std::any_cast<double *>(map["px"]);
-            py = std::any_cast<double *>(map["py"]);
-            pz = std::any_cast<double *>(map["pz"]);
+            histograms.fill(event, weight);
+            event_counter++;
         }
-
-        catch (const std::bad_any_cast &e)
-        {
-            std::cout << e.what() << '\n';
-        }
-
-        for (unsigned int i = 0; i < multi; i++)
-        {
-            particle particle{fn[i], fz[i], px[i], py[i], pz[i]};
-            particle.autofill(this->betacms);
-            particles.push_back(particle);
-        }
-        event event = {Nc, bimp, particles};
-
-        this->fill(event);
-        particles.clear();
     }
-}
+    histograms.normalize(1. / event_counter * NDECAYS);
 
-void manager::fill(const event &event)
-{
-    if (event.Nc == 0)
-    {
-        return;
-    }
-    this->hist.fill(event);
-}
-
-void manager::finish()
-{
-    this->outputfile = new TFile(this->path_out.c_str(), "RECREATE");
-    this->hist.normalize();
-    this->hist.write();
-    this->outputfile->Write();
-    std::cout << "DONE" << std::endl;
+    // saving result
+    TFile *output_file = new TFile(output_pth.c_str(), "RECREATE");
+    output_file->cd();
+    histograms.write();
+    output_file->Write();
+    output_file->Close();
 }
