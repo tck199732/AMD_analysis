@@ -1,6 +1,6 @@
 #include "particle.hh"
 
-void particle::autofill(const double &betacms)
+void particle::autofill(const double &betacms, const double &beam_rapidity)
 {
 
     double nuc_mass = 938.272;
@@ -42,6 +42,7 @@ void particle::autofill(const double &betacms)
     this->etrans = TMath::Sqrt(pow(this->pt, 2.) + pow(nuc_mass, 2.)) - nuc_mass;
 
     this->rapidity_lab = 0.5 * TMath::Log((this->ekinlab + this->pzlab + nuc_mass) / (this->ekinlab - this->pzlab + nuc_mass));
+    this->rapidity_lab_normed = this->rapidity_lab / beam_rapidity;
 
     this->rapidity_cms = 0.5 * TMath::Log((this->ekincms + this->pz + nuc_mass) / (this->ekincms - this->pz + nuc_mass));
 

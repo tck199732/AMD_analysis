@@ -12,7 +12,7 @@ struct particle
     int nid, zid;
     double px, py, pz, ekincms;
     double plab, pcms;
-    double pt, pzlab, ekinlab, rapidity_lab, rapidity_cms;
+    double pt, pzlab, ekinlab, rapidity_lab, rapidity_cms, rapidity_lab_normed;
     double pseudo_rapidity_lab, pseudo_rapidity_cms;
     double thetalab, thetacms, phi;
     double etrans;
@@ -23,7 +23,7 @@ struct particle
     {
         this->coordinate = "uball";
     }
-    void autofill(const double &betacms);
+    void autofill(const double &betacms, const double &beam_rapidity = 1.);
 
     // for emission time analysis
     // are in cms frame presumbly...
