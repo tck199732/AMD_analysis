@@ -1,64 +1,78 @@
 import pathlib
-import os
 import pandas as pd
 import numpy as np
-import pathlib
 import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit
+from astropy import units
+import warnings
 from copy import copy
 
-import pyamd
 from pyamd import PROJECT_DIR
-from pyamd.utilities import root6, helper, minuit
-from pyamd.e15190 import e15190
+from pyamd.utilities import root6, dataframe, minuit
 
 hist_reader = root6.HistogramReader()
-df_helper = helper.DataFrameHelper()
-
-
-class MultiplicityFile:
-    def __init__(self, path):
-        self.path = pathlib.Path(path).resolve()
-
-    def get_names(self):
-        if not self.path.exists():
-            raise OSError(f'file not found : {str(self.path)}')
-        if self.path.is_file() and os.access(self.path, os.R_OK):
-            with root6.TFile(str(self.path)) as file:
-                return [key.GetName() for key in file.GetListOfKeys()]
-
-    def get_histogram(self, name=None, keyword=None):
-        if name is None:
-            names = self.get_names()
-            names = [name for name in names if keyword.lower() in name.lower()]
-            print(names)
-            if len(names) > 1:
-                raise ValueError('more than 1 objects is returned.')
-            name = max(names, key=len)
-
-        with root6.TFile(self.path) as file:
-            hist = file.Get(name)
-            hist.SetDirectory(0)  # will not be deleted when file is closed
-            return hist
+df_helper = dataframe.DataFrameHelper()
 
 
 class Multiplicity_ImpactParameter:
-    DIR = f'{PROJECT_DIR}/result/multiplicity'
+    DIR = f'{PROJECT_DIR}/result/centrality/b10fm'
 
-    def __init__(self, path=None, reaction='Ca48Ni64E140', skyrme='SkM', impact_parameter=(0., 10.), mode='3'):
-        self.reaction = e15190.reaction(reaction)
-        self.betacms = self.reaction.get_betacms()
-        self.beam_rapidity = self.reaction.get_rapidity_beam()
+    def __init__(self, path=None, histname='h2_multi_b', reaction='Ca48Ni64E140', skyrme='SkM', impact_parameter=(0., 10.), mode='3', verbose=0):
+        """ A Class handle calculation from 2D histogram Impact-Parameter VS Multiplicity
+        Parameter
+        ---------
+        path : str, pathlib.Path
+            if None, use the default path
+        histname : str
+            name of the TH2D in the root file
+        reaction : str
+            collision string in the format of {beam}{target}E{energy}
+        skyrme : str
+            skyrme parameter set used in the simulation. For now, either `SkM` or `SLy4` or `SLy4_L108`
+        impact_parameter : tuple of float
+            range of b in the simulation. This is only included for completeness.
+        mode : str, int, float
+            simulation mode : `21` means data from table21. `3` means data from table3 (sec. decay)
+        verbose : int 
+            `0` = quiet
+            `1` = issue warning in case histogram is not found
+        """
+        self.reaction = reaction
+        self.skyrme = skyrme
+        self.impact_parameter = impact_parameter
+        self.mode = str(mode)
 
         if path is None:
-            path = f'{self.DIR}/{reaction}_{skyrme}_table{mode}_b{impact_parameter[1]:.0f}fm.root'
+            path = pathlib.Path(
+                f'{self.DIR}/{reaction}_{skyrme}_table{mode}.root')
+            if not path.exists():
+                raise ValueError(f'path does not exist : {str(path)}')
 
-        spectrafile = MultiplicityFile(path)
-        self.df = spectrafile.get_histogram(keyword=f'h2_multi_b')
-        self.df = hist_reader.hist2d_to_df(self.df)
+        with root6.TFile(str(path)) as file:
+            try:
+                hist = file[histname]
+            except:
+                objname = file.keys()[0]
+                if verbose == 1:
+                    warnings.warn(
+                        f'hist name {histname} not found in root file. We will use the first object in the file, i.e. `{objname}`')
+                hist = file[objname]
 
-    def MultiplicitySpectra(self, range=(-0.5, 24.5), cut=(0., 10.), bins=25):
+            self.df = hist_reader.hist2d_to_df(hist)
 
+    def MultiplicitySpectra(self, range=(-0.5, 24.5), cut=(0., 10.), bins=25, normalize=True):
+        """ Projection to get multiplicity spectra
+        Parameter
+        ---------
+        range : tuple of float
+            range of multiplicity
+        cut : tuple of float
+            cut on impact-parameter
+        bins : int
+            number of bins
+        normalize : bool
+            if True, normalize by bin width
+        """
         df = self.df.copy()
         binwidth = np.diff(df['y'][0:2])
         cut1 = cut[0] - binwidth/2.
@@ -75,7 +89,8 @@ class Multiplicity_ImpactParameter:
 
         # normalization
         dM = np.diff(range)/bins
-        norm = np.abs(dM)
+        norm = np.abs(dM) if normalize else 1.
+
         return pd.DataFrame({
             'x': 0.5 * (bin_edges[1:] + bin_edges[:-1]),
             'y': hist / norm,
@@ -83,8 +98,19 @@ class Multiplicity_ImpactParameter:
             'y_ferr': np.divide(hist_err, hist, out=np.zeros_like(hist_err), where=(hist > 0.0))
         })
 
-    def ImpactParameterSpectra(self, range=(0., 10.), cut=(-0.5, 24.5), bins=20):
-
+    def ImpactParameterSpectra(self, range=(0., 10.), cut=(-0.5, 24.5), bins=20, normalize=False):
+        """ Projection to get impact-parameter spectra
+        Parameter
+        ---------
+        range : tuple of float 
+            range of b
+        cut : tuple of float 
+            cut on multiplity
+        bins : int
+            number of bins
+        normalize : bool
+            if True, normalize by bin width
+        """
         df = self.df.copy()
         df.query(f'x >= {cut[0]} & x <= {cut[1]}', inplace=True)
 
@@ -96,7 +122,7 @@ class Multiplicity_ImpactParameter:
 
         # normalization
         db = np.diff(range)/bins
-        norm = np.abs(db)
+        norm = np.abs(db) if normalize else 1.
 
         return pd.DataFrame({
             'x': 0.5 * (bin_edges[1:] + bin_edges[:-1]),
@@ -105,53 +131,168 @@ class Multiplicity_ImpactParameter:
             'y_ferr': np.divide(hist_err, hist, out=np.zeros_like(hist_err), where=(hist > 0.0))
         })
 
-    def DifferentialCrossSection(self, range=(0., 10.), cut=(-0.5, 24.5), bins=20, unit=1.):
-        # normalized dM/db
+    def DifferentialCrossSection(self, range=(0., 10.), cut=(-0.5, 24.5), bins=20, unit=None):
+        """ Obtain differential cross section :math: `d\sigma/db`
+        Parameter
+        ---------
+        range : tuple of float
+            range of b
+        cut : tuple of float
+            cut on multiplicity
+        bins : int
+            number of bins
+        unit : str
+            `None` : use the same unit as in simulation, i.e. fm^2
+            `b` : barn
+            `mb` : 0.1 barn
+        """
+        # normalized impact parameter spectra dM/db
         df = self.ImpactParameterSpectra(
-            range=range, cut=cut, bins=bins)
+            range=range, cut=cut, bins=bins, normalize=True)
+
+        # first get total cross section \pi bmax^2 (fm^2)
+        cs = np.pi * range[1]**2 * units.fm**2
+
+        if unit is None:
+            pass
+        elif unit == 'mb':
+            cs = cs.to(1e-3 * units.barn)
+        elif unit == 'b':
+            cs = cs.to(units.barn)
 
         # dsigma/db = \pi bmax^2 * normalized dM/db
-        cs = np.pi * range[1]**2
-        if unit == 'mb':
-            unit = 10.
+        dsigma_db = cs.value * df.y
+        error = cs.value * df['y_err']
 
-        return pd.DataFrame({
+        df = pd.DataFrame({
             'x': df.x,
-            'y': unit * cs * df.y,
-            'y_err': unit * cs * df['y_err'],
-            'y_ferr': df['y_ferr']
+            'y': dsigma_db,
+            'y_err': error
         })
+        df_helper.calculate_relative_error(df)
+        return df
 
-    def CrossSection(self, unit=1.):
-        df = self.DifferentialCrossSection()  # full range
+    def CrossSection(self, range=(0., 10.), cut=(-0.5, 24.5), bins=20, unit=None):
+        """ Integrate :math: `d\sigma/db` to get :math: `\sigma`
+        range : tuple of float
+            range of b
+        cut : tuple of float
+            cut on multiplicity
+        bins : int
+            number of bins
+        unit : str
+            `None` : use the same unit as in simulation, i.e. fm^2
+            `b` : barn
+            `mb` : 0.1 barn
+        """
+        df = self.DifferentialCrossSection(
+            range, cut, bins, unit)  # full range
         db = np.diff(df.x[0:2])
-        if unit == 'mb':
-            unit = 1./10
-        elif unit == 'b':
-            unit = 1./100
+        return np.sum(df['y']) * db
 
-        return np.sum(df['y']) * db * unit
+    def BmaxFromCrossSection(self, range=(0., 10.), cut=(-0.5, 24.5), bins=20, unit=None):
+        return np.sqrt(self.CrossSection(range, cut, bins, unit) / np.pi)
 
-    def BmaxFromCrossSection(self, unit=1.):
-        return np.sqrt(self.CrossSection(unit=unit) / np.pi)
-
-    def Mapping(self, unit=1.):
-
-        df = self.MultiplicitySpectra()
-        df.query('y > 0.0', inplace=True)
-        df['y'] = df['y'] / np.sum(df['y'])
-        df['y_err'] = df['y_err'] / np.sum(df['y'])
-        bmax = self.BmaxFromCrossSection(unit=unit)
+    def Mapping(self, ranges=[[-0.5, 24.5], [0., 10.]], bins=[25, 20], unit=None):
+        """ Calculate the mapping from charged-particle multiplicty to Impact-Parameter
+        Parameter
+        ---------
+        range: 
+            range of multiplicty (0) and b (1)
+        bins:
+            bins of multiplicty (0) and b (1) 
+        unit:
+            unit of impact-parameter
+            `None` : fm
+        """
+        df = self.MultiplicitySpectra(
+            range=ranges[0], cut=ranges[1], bins=bins[0]).query('y > 0.0')
+        df['y'] /= np.sum(df['y'])
+        df['y_err'] /= np.sum(df['y'])
+        bmax = self.BmaxFromCrossSection(
+            range=ranges[1], cut=ranges[0], bins=bins[1], unit=unit)
         y = bmax * np.sqrt(np.abs(1. - np.cumsum(df['y'])))
         yerr = 0.5 * bmax**2 / y * np.sqrt(np.cumsum(df['y_err']**2))
 
-        return pd.DataFrame({
+        df = pd.DataFrame({
             'x': df.x.to_numpy(),
             'y': y,
-            'y_err': 0.,
+            'y_err': yerr,
+        })
+
+        df_helper.calculate_relative_error(df, inplace=True)
+        return df
+
+    @staticmethod
+    def model_dsigma_db(x, norm, b0, db):
+        return norm * x / (1 + np.exp((x-b0)/db))
+
+    @staticmethod
+    def model_dsigma_db_error(x, norm, b0, db, norm_err, b0_err, db_err):
+        return 0
+
+    def fit_dsigma_db(self, df=None, range=(0., 10.), bins=20, unit=None):
+        """ Fit the differential cross-section using TMinuit.
+        Parameter
+        ---------
+        df : pd.DataFrame
+            dataframe of the :math: `d\sigma/db`
+        range : tuple of float
+            range of b used in calculating :math: `d\sigma/db`
+        bins : int
+            number of bins used in calculating :math: `d\sigma/db`
+        unit : str
+            This unit is used in the final output. The fit is always done using the origianl unit of :math: `d\sigma/db`, i.e. :math: `fm^2` or `unit = None`
+            `mb` : 1e-1 barn
+        """
+        if df is None:
+            df = self.DifferentialCrossSection(
+                range=range, bins=bins, unit=None)
+        global fcn
+        global xarray
+        xarray = df.x.to_numpy()
+
+        def fcn(npar, gin, f, par, iflag):
+            chisq = (Multiplicity_ImpactParameter.model_dsigma_db(xarray, par[0], par[1], par[2]) -
+                     df.y.to_numpy()) / df['y_err']
+            chisq = np.sum(chisq**2)
+            f.value = chisq
+
+        gMinuit = minuit.TMinuit(3, fcn)
+        gMinuit.set_parameter(0, 'norm', 2. * np.pi, 0.1)
+        gMinuit.set_parameter(1, 'b0', 9., 0.1)
+        gMinuit.set_parameter(2, 'db', 0.1, 0.01)
+        gMinuit.fit()
+
+        norm = gMinuit.get_parameter('norm')
+        b0 = gMinuit.get_parameter('b0')
+        db = gMinuit.get_parameter('db')
+
+        norm_err = gMinuit.get_error('norm')
+        b0_err = gMinuit.get_error('b0')
+        db_err = gMinuit.get_error('db')
+
+        x = df.x.to_numpy()
+        y = Multiplicity_ImpactParameter.model_dsigma_db(
+            df.x.to_numpy(), norm, b0, db
+        ) * units.fm**2
+        yerr = Multiplicity_ImpactParameter.model_dsigma_db_error(
+            df.x.to_numpy(), norm, b0, db, norm_err, b0_err, db_err
+        ) * units.fm**2
+
+        if unit == 'mb':
+            y = y.to(1e-3 * units.barn)
+            yerr = yerr.to(1e-3 * units.barn)
+
+        elif unit == 'b':
+            y = y.to(units.barn)
+            yerr = yerr.to(units.barn)
+
+        return pd.DataFrame({
+            'x': x,
+            'y': y.value,
+            'y_err': yerr.value,
             'y_ferr': 0.
-            # 'y_err': yerr,
-            # 'y_ferr': np.divide(yerr, y, out=np.zeros_like(yerr), where=(y > 0.0))
         })
 
     def plot_multiplicity(self, ax=None, range=(-0.5, 24.5), cut=(0., 10.), bins=25, **kwargs):
@@ -165,58 +306,6 @@ class Multiplicity_ImpactParameter:
         kw = dict(
             fmt='.',
         )
-        kw.update(kwargs)
-        return df_helper.plot1d(ax, df, **kw)
-
-    def model_dsigma_db(self, x, norm, b0, db):
-        return norm * x / (1 + np.exp((x-b0)/db))
-
-    def fit_dsigma_db(self, df=None, range=(0., 10.), bins=20):
-        if df is None:
-            df = self.DifferentialCrossSection(
-                range=range, bins=bins, unit=1.)
-        global fcn
-        global xarray
-        xarray = df.x.to_numpy()
-
-        def fcn(npar, gin, f, par, iflag):
-            chisq = (self.model_dsigma_db(xarray, par[0], par[1], par[2]) -
-                     df.y.to_numpy()) / df['y_err']
-            chisq = np.sum(chisq**2)
-            f.value = chisq
-
-        gMinuit = minuit.TMinuit(3, fcn)
-        gMinuit.set_parameter(0, 'norm', 6.28, 0.1)
-        gMinuit.set_parameter(1, 'b0', 9., 0.1)
-        gMinuit.set_parameter(2, 'db', 0.1, 0.01)
-        gMinuit.fit()
-
-        norm = gMinuit.get_parameter('norm')
-        b0 = gMinuit.get_parameter('b0')
-        db = gMinuit.get_parameter('db')
-
-        return pd.DataFrame({
-            'x': df.x.to_numpy(),
-            'y': self.model_dsigma_db(df.x.to_numpy(), norm, b0, db),
-            'y_err': 0.,
-            'y_ferr': 0.
-        })
-
-    def plot_fitted_dsigma_db(self, ax=None, df=None, range=(0., 10.), bins=20, unit=1., **kwargs):
-        df = self.fit_dsigma_db(df=df, range=range, bins=bins)
-
-        unit = 10. if unit == 'mb' else 1.
-        df['y'] = df['y'] * unit
-        df['y_err'] = df['y_err'] * unit
-        kw = dict(fmt='--')
-        kw.update(kwargs)
-        return df_helper.plot1d(ax, df, **kw)
-
-    def plot_dsigma_db(self, ax=None, df=None, range=(0., 10.), bins=20, unit=1., **kwargs):
-        if df is None:
-            df = self.DifferentialCrossSection(
-                range=range, bins=bins, unit=unit)
-        kw = dict(fmt='.',)
         kw.update(kwargs)
         return df_helper.plot1d(ax, df, **kw)
 
@@ -247,7 +336,7 @@ class Multiplicity_ImpactParameter:
         def model(x, norm, mean, sigma):
             return norm * np.exp(-(x-mean)**2 / 2. / sigma**2)
 
-        df.query('y > 0.0 & y_err > 0.0', inplace=True)
+        df = df.query('y > 0. & y_err > 0.')
 
         par, cov = curve_fit(
             #lambda x, *par : model(x, *par),
@@ -296,18 +385,11 @@ class Multiplicity_ImpactParameter:
         kw.update(kwargs)
         return self.plotfit(ax, df, range=range, bins=bins, **kw)
 
-    def plot_mapping(self, ax=None, unit=1., **kwargs):
-        df = self.Mapping(unit=unit)
-
-        kw = dict(fmt='ko')
-        kw.update(kwargs)
-        return df_helper.plot1d(ax, df, **kw)
-
-    def output(self, df, path, **kwargs):
-        kw = dict(
-            sep='\t',
-            columns=df.columns,
-            mode='w',
-        )
-        kw.update(kwargs)
-        df.to_csv(path, kw)
+    # def output(self, df, path, **kwargs):
+    #     kw = dict(
+    #         sep='\t',
+    #         columns=df.columns,
+    #         mode='w',
+    #     )
+    #     kw.update(kwargs)
+    #     df.to_csv(path, kw)
