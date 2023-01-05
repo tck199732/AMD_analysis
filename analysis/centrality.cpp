@@ -89,7 +89,7 @@ int main(int argc, char *argv[])
             event_counter++;
         }
     }
-    histograms.normalize(1. / event_counter * NDECAYS);
+    histograms.normalize(event_counter / NDECAYS);
 
     // saving result
     TFile *output_file = new TFile(output_pth.c_str(), "RECREATE");

@@ -102,7 +102,7 @@ int main(int argc, char *argv[])
             histograms.fill(particle, 1.);
         }
     }
-    histograms.normalize(1. / chain->GetEntries());
+    histograms.normalize(chain->GetEntries());
 
     std::cout << "number fo unphysical emission time : " << count_neg_time << std::endl;
 
