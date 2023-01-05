@@ -162,3 +162,12 @@ class MultiplicityMapping:
         df = self.df.loc[self.df['multiplicity']==m]
         return (df[y].values[0], df[f'{y}_err'].values[0])
 
+    def plot_impact_parameter_mapping(self, ax=None, y:Literal['b', 'bhat']='b', **kwargs):
+        if ax is None:
+            ax = plt.gca()
+            
+        kw = dict(
+            fmt = 'k--.',
+        )
+        kw.update(kwargs)
+        return ax.errorbar(self.df['multiplicity'], self.df[y], yerr=self.df[f'{y}_err'], **kw)
