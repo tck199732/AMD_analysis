@@ -1,199 +1,132 @@
 #include "amd2root.hh"
 
+void _check_path(const std::string &path)
+{
+    if (!fs::exists(path))
+    {
+        std::string msg = Form("%s does not exists.", path.c_str());
+        throw std::invalid_argument(msg.c_str());
+    }
+    return;
+}
+
+int get_number_nucleons(const std::string reaction)
+{
+    std::regex regexp("[0-9]+");
+    std::smatch matches;
+    int amass = 0;
+
+    std::string temp = reaction;
+    for (auto _ = 0; _ < 2; _++)
+    {
+        std::regex_search(temp, matches, regexp);
+        amass += stoi(matches[0]);
+        temp = matches.suffix().str();
+    }
+
+    return amass;
+}
+
+void CompileTable21(TTree *&tree, const std::string &path, const int &amass);
+void CompileTable3(TTree *&tree, const std::string &path, const int &amass);
+void CompileTable21t(TTree *&tree, const std::string &path_table21, const std::string &path_amdgid, const std::string &path_coll_hist, const int &amass);
+
 int main(int argc, char **argv)
 {
     std::string reaction = argv[1];
     std::string mode = argv[2];
+
+    // check arguments validity
+    if (mode != "21" && mode != "3" && mode != "21t")
+    {
+        std::cout << "input mode = " << mode << std::endl;
+        throw std::invalid_argument("acceptable modes : 21, 21t or 3");
+    }
+
     std::string path_data = argv[3];
     std::string path_out = argv[4];
     std::string path_coll_hist = "";
     std::string path_amdgid = "";
 
-    if (mode != "21" && mode != "3" && mode != "21t")
-    {
-        std::cout << "input mode = " << mode << std::endl;
-        throw std::invalid_argument("invalid mode : 21, 21t or 3");
-    }
-
+    _check_path(path_data);
     if (mode == "21t")
     {
-        if (argc < 7)
-        {
-            throw std::invalid_argument("please provide path for amdgid and coll_hist.");
-        }
         path_amdgid = argv[5];
         path_coll_hist = argv[6];
+        _check_path(path_amdgid);
+        _check_path(path_coll_hist);
     }
 
-    manager manager = {reaction, mode, path_data, path_out, path_amdgid, path_coll_hist};
-    manager.init();
-    manager.compile();
-    manager.finish();
-    return 0;
-}
-
-void manager::init()
-{
-
-    if (!fs::exists(this->path_data))
-    {
-        throw std::invalid_argument("data path does not exists.");
-    }
+    TTree *tree = new TTree("AMD", "AMD");
+    Initialize_Tree(tree, mode);
 
     // find the total number of nucleons in the reaction system
     // e.g. Ca48Ni64E140 -> 48 + 64 = 112
-    std::regex regexp("[0-9]+");
-    std::smatch matches;
-    this->amass = 0;
+    int amass = get_number_nucleons(reaction);
 
-    std::string temp = this->reaction;
-    for (auto _ = 0; _ < 2; _++)
-    {
-        std::regex_search(temp, matches, regexp);
-        this->amass += stoi(matches[0]);
-        temp = matches.suffix().str();
-    }
-    std::cout << "reaction system : " << this->reaction << std::endl;
-    std::cout << "Nucleon Mass of Reaction : " << this->amass << std::endl;
-    std::cout << "Operation Mode : " << this->mode << std::endl;
-    std::cout << "path to data : " << fs::absolute(this->path_data) << std::endl;
-    std::cout << "path to output : " << fs::absolute(this->path_out) << std::endl;
-
-    if (this->mode == "21t")
-    {
-        if (!fs::exists(this->path_amdgid))
-        {
-            throw std::invalid_argument("amdgid.dat does not exist.");
-        }
-        if (!fs::exists(this->path_coll_hist))
-        {
-            throw std::invalid_argument("coll_hist.dat does not exist.");
-        }
-        std::cout << "path to amdgid : " << fs::absolute(this->path_amdgid) << std::endl;
-        std::cout << "path to coll hist : " << fs::absolute(this->path_coll_hist) << std::endl;
-    }
-
-    this->init_writer();
-}
-
-void manager::init_writer()
-{
-    this->writer = new RootWriter(fs::absolute(this->path_out), this->tr_name, "RECREATE");
-
-    std::vector<branch> branches = {
-        {"multi", "int"},
-        {"b", "double"},
-        {"N", "int[multi]"},
-        {"Z", "int[multi]"},
-        {"px", "double[multi]"},
-        {"py", "double[multi]"},
-        {"pz", "double[multi]"},
-    };
-
-    if (this->mode == "21")
-    {
-        branches.push_back({"ENG", "double[multi]"});
-        branches.push_back({"LANG", "double[multi]"});
-        branches.push_back({"JX", "double[multi]"});
-        branches.push_back({"JY", "double[multi]"});
-        branches.push_back({"JZ", "double[multi]"});
-    }
-
-    if (this->mode == "3")
-    {
-        branches.push_back({"J", "double[multi]"});
-        branches.push_back({"M", "double[multi]"});
-        branches.push_back({"WEIGHT", "double[multi]"});
-        branches.push_back({"iFRG", "int[multi]"});
-    }
-
-    if (this->mode == "21t")
-    {
-        branches.push_back({"t", "double[multi]"});
-        branches.push_back({"x", "double[multi]"});
-        branches.push_back({"y", "double[multi]"});
-        branches.push_back({"z", "double[multi]"});
-    }
-
-    for (auto &br : branches)
-    {
-        br.autofill();
-    }
-    this->writer->set_branches(tr_name, branches);
-}
-
-void manager::compile()
-{
-    if (this->mode == "21")
+    if (mode == "21")
     {
         std::cout << "extracting table21 to root file" << std::endl;
-        this->compile21();
+        CompileTable21(tree, path_data, amass);
     }
-    else if (this->mode == "21t")
+    else if (mode == "21t")
     {
         std::cout << "extracting table21, with xyzt to root file" << std::endl;
-        this->compile21t();
+        CompileTable21t(tree, path_data, path_amdgid, path_coll_hist, amass);
     }
-    else if (this->mode == "3")
+    else if (mode == "3")
     {
         std::cout << "extracting table3 to root file" << std::endl;
-        this->compile3();
+        CompileTable3(tree, path_data, amass);
     }
-    return;
+
+    TFile *outputfile = new TFile(path_out.c_str(), "RECREATE");
+    outputfile->cd();
+    tree->Write();
+    outputfile->Write();
+    outputfile->Close();
 }
 
-void manager::compile21()
+void CompileTable21(TTree *&tree, const std::string &path, const int &amass)
 {
-    std::cout << "loading table21 : " << this->path_data << std::endl;
-    std::ifstream file_table21(this->path_data.c_str());
+    std::ifstream file_table21(path.c_str());
 
-    double px, py, pz;
-    double ENG, LANG, JX, JY, JZ;
-    double bimp;
-    int N, Z;
     int eventID;
     int nucleons_count = 0;
+    int multi = 0;
 
-    std::vector<particle> particles;
-    event event;
     while (!file_table21.eof())
     {
-        file_table21 >> Z >> N >> px >> py >> pz;
-        if (Z == 0 && N == 0)
+        file_table21 >> amd.Z[multi] >> amd.N[multi] >> amd.px[multi] >> amd.py[multi] >> amd.pz[multi];
+        if (amd.Z[multi] == 0 && amd.N[multi] == 0)
         {
             break;
         }
-        file_table21 >> ENG >> LANG >> JX >> JY >> JZ;
-        file_table21 >> bimp >> eventID;
+        file_table21 >> amd.ENG[multi] >> amd.LANG[multi] >> amd.JX[multi] >> amd.JY[multi] >> amd.JZ[multi];
+        file_table21 >> amd.b >> eventID;
 
-        particle particle = {Z, N, px, py, pz};
-        // particle.report();
-        particles.push_back(particle);
-        nucleons_count += Z + N;
-
-        if (nucleons_count == this->amass)
+        nucleons_count += amd.Z[multi] + amd.N[multi];
+        multi++;
+        if (nucleons_count == amass)
         {
-            event = {eventID, bimp, particles};
-            this->fill(event);
-            particles.clear();
+            amd.multi = multi;
+            tree->Fill();
+            multi = 0;
             nucleons_count = 0;
         }
     }
     return;
 }
 
-void manager::compile21t()
+void CompileTable21t(TTree *&tree, const std::string &path_table21, const std::string &path_amdgid, const std::string &path_coll_hist, const int &amass)
 {
     int event_processed = 0;
-    std::cout << "loading table21 : " << fs::absolute(this->path_data) << std::endl;
-    std::ifstream file_table21(fs::absolute(this->path_data));
+    std::ifstream file_table21(path_table21.c_str());
 
-    std::cout << "loading amdgid : " << fs::absolute(this->path_amdgid) << std::endl;
-    std::ifstream file_amdgid(fs::absolute(this->path_amdgid));
+    std::ifstream file_amdgid(path_amdgid.c_str());
     file_amdgid.ignore(99, '\n');
 
-    std::cout << "loading collision history : " << fs::absolute(this->path_coll_hist) << std::endl;
-    std::ifstream file_coll_hist(fs::absolute(this->path_coll_hist));
+    std::ifstream file_coll_hist(path_coll_hist.c_str());
     file_coll_hist.ignore(99, '\n');
 
     // particle id -> [gids]
@@ -206,10 +139,9 @@ void manager::compile21t()
 
     while (!file_amdgid.eof())
     {
-        for (int _ = 1; _ <= this->amass; _++)
+        for (int _ = 1; _ <= amass; _++)
         {
             file_amdgid >> prim_pid >> nuc >> gid >> N >> Z >> ievt;
-            // std::cout << prim_pid << "\t" << nuc << "\t" << gid << "\t" << N << "\t" << Z << "\t" << ievt << std::endl;
             if (gidmap.count(prim_pid) == 0)
             {
                 gidmap[prim_pid] = std::vector<int>(1, gid);
@@ -220,8 +152,8 @@ void manager::compile21t()
             }
         }
 
-        // std::cout << gidmap.size() << std::endl;
         int current_evt = ievt;
+        int multi = 0;
         while (!file_coll_hist.eof())
         {
             int collid;
@@ -243,8 +175,6 @@ void manager::compile21t()
             }
             else
             {
-                std::vector<particle> particles;
-                event event;
                 double px, py, pz, bimp, buffer;
                 for (unsigned int j = 1; j <= gidmap.size(); j++)
                 {
@@ -252,7 +182,8 @@ void manager::compile21t()
                     spacetime[0] = -1.;
                     for (const auto &id : gidmap[j])
                     {
-                        std::vector<double> last_interaction(7, 0.); // for each nucleon in a prim. particle
+                        // for each multi in a prim. particle
+                        std::vector<double> last_interaction(7, 0.);
                         for (const auto &hist : coll_hist[id])
                         {
                             int collid = hist.first;
@@ -275,148 +206,79 @@ void manager::compile21t()
                     spacetime[2] /= gidmap[j].size();
                     spacetime[3] /= gidmap[j].size();
 
-                    file_table21 >> Z >> N >> px >> py >> pz;
+                    amd.t[multi] = spacetime[0];
+                    amd.x[multi] = spacetime[1];
+                    amd.y[multi] = spacetime[2];
+                    amd.z[multi] = spacetime[3];
+
+                    file_table21 >> amd.Z[multi] >> amd.N[multi] >> amd.px[multi] >> amd.py[multi] >> amd.pz[multi];
                     for (auto _ = 0; _ < 5; _++)
                     {
                         file_table21 >> buffer;
                     }
-                    file_table21 >> bimp >> ievt;
-
-                    particle particle = {Z, N, px, py, pz, spacetime[0], spacetime[1], spacetime[2], spacetime[3]};
-                    particles.push_back(particle);
+                    file_table21 >> amd.b >> ievt;
                 }
 
-                event = {ievt, bimp, particles};
-                // event.report();
-                this->fill(event);
-                particles.clear();
-
+                tree->Fill();
                 gidmap.clear();
                 coll_hist.clear();
                 coll_hist[gid].push_back(pair);
                 break;
             }
         }
-
+        multi = 0;
         event_processed++;
-        // if (event_processed % 1000 == 0)
-        // {
-        //     std::cout << event_processed << std::endl;
-        // }
     }
 }
 
-void manager::compile3()
+void CompileTable3(TTree *&tree, const std::string &path, const int &amass)
 {
-    std::cout << "loading table3 : " << this->path_data << std::endl;
-    std::ifstream file_table3(this->path_data.c_str());
+    std::ifstream file_table3(path.c_str());
     file_table3.ignore(99, '\n');
 
-    double px, py, pz;
-    double J, M, WEIGHT;
-    double bimp;
-    int N, Z, iFRG;
     int eventID;
     int nucleons_count = 0;
-
-    std::vector<particle> particles;
-    event event;
+    int multi = 0;
     while (!file_table3.eof())
     {
-        file_table3 >> Z >> N >> px >> py >> pz;
-        if (Z == 0 && N == 0)
+        file_table3 >> amd.Z[multi] >> amd.N[multi] >> amd.px[multi] >> amd.py[multi] >> amd.pz[multi];
+        if (amd.Z[multi] == 0 && amd.N[multi] == 0)
         {
             break;
         }
-        file_table3 >> J >> M >> WEIGHT;
-        file_table3 >> bimp >> eventID;
-        file_table3 >> iFRG;
+        file_table3 >> amd.J[multi] >> amd.M[multi] >> amd.WEIGHT[multi];
+        file_table3 >> amd.b >> eventID;
+        file_table3 >> amd.iFRG[multi];
 
-        particle particle = {Z, N, px, py, pz};
-        particles.push_back(particle);
-        nucleons_count += Z + N;
-        if (nucleons_count == this->amass)
+        nucleons_count += amd.Z[multi] + amd.N[multi];
+        multi++;
+
+        if (nucleons_count == amass)
         {
-            event = {eventID, bimp, particles};
-            this->fill(event);
-            particles.clear();
+            tree->Fill();
             nucleons_count = 0;
+            multi = 0;
         }
     }
     return;
 }
 
-void manager::fill(const event &event)
-{
-    std::vector<double> px, py, pz;
-    std::vector<int> N, Z;
-    std::vector<double> t, x, y, z;
-    auto resize = [event](auto &&...args)
-    {
-        (args.resize(event.particles.size()), ...);
-    };
-    resize(px, py, pz, N, Z, t, x, y, z);
-    int id = 0;
-    for (const auto &particle : event.particles)
-    {
-        px[id] = particle.px;
-        py[id] = particle.py;
-        pz[id] = particle.pz;
-        N[id] = particle.N;
-        Z[id] = particle.Z;
-        if (this->mode == "21t")
-        {
-            t[id] = particle.t;
-            x[id] = particle.x;
-            y[id] = particle.y;
-            z[id] = particle.z;
-        }
-        id++;
-    }
+// void particle::report()
+// {
+//     auto print = [](auto &&...args)
+//     {
+//         ((std::cout << args << "\t"), ...) << std::endl;
+//     };
+//     print(this->Z, this->N, this->px, this->py, this->pz);
+// }
 
-    // std::cout << sizeof(px[0]) * px.size() << std::endl;
+// void event::report()
+// {
 
-    this->writer->set(this->tr_name, "multi", (int)event.particles.size());
-    this->writer->set(this->tr_name, "b", event.b);
-    this->writer->set(this->tr_name, "px", px);
-    this->writer->set(this->tr_name, "py", py);
-    this->writer->set(this->tr_name, "pz", pz);
-    this->writer->set(this->tr_name, "N", N);
-    this->writer->set(this->tr_name, "Z", Z);
-
-    if (this->mode == "21t")
-    {
-        this->writer->set(this->tr_name, "t", t);
-        this->writer->set(this->tr_name, "x", x);
-        this->writer->set(this->tr_name, "y", y);
-        this->writer->set(this->tr_name, "z", z);
-    }
-
-    this->writer->fill();
-}
-
-void manager::finish()
-{
-    this->writer->write();
-    std::cout << "DONE" << std::endl;
-}
-
-void particle::report()
-{
-    auto print = [](auto &&...args)
-    {
-        ((std::cout << args << "\t"), ...) << std::endl;
-    };
-    print(this->Z, this->N, this->px, this->py, this->pz);
-}
-
-void event::report()
-{
-
-    std::cout << "event : " << this->eventID << '\t'
-              << "b  = " << this->b << "[fm]" << std::endl;
-    for (auto &particle : this->particles)
-    {
-        particle.report();
-    }
-}
+//     std::cout << "event : " << this->eventID << '\t'
+//               << "b  = " << this->b << "[fm]" << std::endl;
+//     for (auto &particle : this->particles)
+//     {
+//         particle.report();
+//     }
+// }
