@@ -1,8 +1,8 @@
 import pandas as pd
 import numpy as np
 from pyamd.e15190 import e15190
-from pyamd.utilities import helper
-df_helper = helper.DataFrameHelper()
+from pyamd.utilities import dataframe
+df_helper = dataframe.DataFrameHelper()
 class R21:
     def __init__(self, particle, df_R21 = None, df_prich=None, df_nrich=None):
         self.particle = e15190.particle(particle)

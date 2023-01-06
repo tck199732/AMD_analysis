@@ -1,15 +1,18 @@
 import pathlib
 import os
+import iminuit
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from copy import copy
+
 from pyamd import PROJECT_DIR
 from pyamd.e15190 import e15190
-from pyamd.utilities import root6, minuit, helper
-import iminuit
+from pyamd.utilities import root6, dataframe
+
+
 hist_reader = root6.HistogramReader()
-df_helper = helper.DataFrameHelper()
+df_helper = dataframe.DataFrameHelper()
 
 class EmissionTimeFile:
     def __init__(self, path):

@@ -2,8 +2,8 @@ import pandas as pd
 import numpy as np
 import iminuit
 from pyamd.e15190 import e15190
-from pyamd.utilities import helper, minuit
-df_helper = helper.DataFrameHelper()
+from pyamd.utilities import dataframe, minuit
+df_helper = dataframe.DataFrameHelper()
 
 
 class Isoscaling:
@@ -157,7 +157,7 @@ class Isoscaling:
             'y_err': self.alpha_err,
             'y_ferr': np.divide(self.alpha_err, self.alpha, where=(self.alpha != 0.0), out=np.zeros_like(self.alpha_err))
         })
-        return helper.plot1d(ax, df, **kwargs)
+        return df_helper.plot1d(ax, df, **kwargs)
 
     def plotChemPotentialBeta(self, ax=None, **kwargs):
         df = self.r21['p'].df.copy()
@@ -170,4 +170,4 @@ class Isoscaling:
             'y_err': self.beta_err,
             'y_ferr': np.divide(self.beta_err, self.beta, where=(self.beta != 0.0), out=np.zeros_like(self.beta_err))
         })
-        return helper.plot1d(ax, df, drop_zeros=True, **kwargs)
+        return df_helper.plot1d(ax, df, drop_zeros=True, **kwargs)

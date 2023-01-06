@@ -2,8 +2,8 @@ import pandas as pd
 import numpy as np
 import itertools
 from pyamd.e15190 import e15190
-from pyamd.utilities import helper
-df_helper = helper.DataFrameHelper()
+from pyamd.utilities import dataframe
+df_helper = dataframe.DataFrameHelper()
 
 
 class Coalescence:
@@ -44,14 +44,14 @@ class Coalescence:
         else:
             df1 = self.spectra['n'].copy()
 
-        df1 = helper.rebin1d(df1, range=range, bins=bins)
-        df2 = helper.rebin1d(self.spectra['p'], range=range, bins=bins)
-        return helper.ratio1d(df2, df1)
+        df1 = df_helper.rebin1d(df1, range=range, bins=bins)
+        df2 = df_helper.rebin1d(self.spectra['p'], range=range, bins=bins)
+        return df_helper.ratio1d(df2, df1)
 
     def plot_npRatio(self, ax=None, range=(0, 600), bins=30, pseudo_neutron=False, **kwargs):
         df = self.npRatio(range=range, bins=bins,
                           pseudo_neutron=pseudo_neutron)
-        return helper.plot1d(ax, df, drop_zeros=True, drop_large_err=True, rel_err=0.05, **kwargs)
+        return df_helper.plot1d(ax, df, drop_zeros=True, drop_large_err=True, rel_err=0.05, **kwargs)
 
     def ChemicalTemperature(self, bins=30, range=(0, 600)):
 
@@ -62,7 +62,7 @@ class Coalescence:
 
         df = dict()
         for pn in required_particle:
-            df[pn] = helper.rebin1d(self.spectra[pn], range=range, bins=bins)
+            df[pn] = df_helper.rebin1d(self.spectra[pn], range=range, bins=bins)
 
         num = df['d']['y'] * df['4He']['y']
         den = df['t']['y'] * df['3He']['y']
