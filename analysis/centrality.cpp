@@ -81,8 +81,8 @@ int main(int argc, char *argv[])
     {
         chain->GetEntry(ievt);
 
-        int multi = analysis == "default" ? DATASTRUCT.multi : DATASTRUCT.Nc;
-        Event event = {multi, DATASTRUCT.b};
+        int multi = analysis == "default" ? AMD.multi : AMD.Nc;
+        Event event = {multi, AMD.b};
         if (event_cut.pass(event))
         {
             histograms.fill(event, weight);

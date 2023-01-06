@@ -1,6 +1,7 @@
-#include "../src/system_info.cpp"
+#include "../src/Physics.cpp"
 #include "../src/particle.cpp"
 #include "../src/Microball.cpp"
+#include "../src/HiRA.cpp"
 
 #include "TChain.h"
 #include "TFile.h"
@@ -13,67 +14,23 @@
 #include <filesystem>
 namespace fs = std::filesystem;
 
-// struct VetoWall
-// {
-//     std::map<std::string, std::array<double, 2>> Ekinlabcut;
-//     std::map<std::string, std::array<double, 2>> thetalabcut;
-//     std::map<std::string, std::array<double, 2>> philabcut;
-//     void init();
-//     bool pass_ekinlab(const particle &particle);
-//     bool pass_angle(const particle &particle);
-// };
-
-// struct NeutronWall
-// {
-// };
-
-struct HiRA
-{
-    std::map<std::string, std::array<double, 2>> Ekinlabcut = {
-        {"p", {20.0, 198.0}},
-        {"d", {15.0, 263.0 / 2}},
-        {"t", {12.0, 312 / 3.}},
-        {"3He", {20.0, 200.0}},
-        {"4He", {18.0, 200.0}},
-    };
-    std::array<double, 2> thetalabcut = {30., 75.};
-    std::array<double, 2> philabcut = {0, 360};
-    bool pass_ekinlab(const particle &particle);
-    bool pass_angle(const particle &particle);
-};
-
-bool HiRA::pass_ekinlab(const particle &particle)
-{
-    if (this->Ekinlabcut.count(particle.name) == 0)
-    {
-        return 0;
-    }
-    return (particle.ekinlab >= this->Ekinlabcut[particle.name][0] && particle.ekinlab <= this->Ekinlabcut[particle.name][1]);
-}
-bool HiRA::pass_angle(const particle &particle)
-{
-    return (particle.thetalab >= this->thetalabcut[0] && particle.thetalab <= this->thetalabcut[1] && particle.phi >= this->philabcut[0] && particle.phi <= this->philabcut[1]);
-}
-
-HiRA hira_detector;
-
 Microball *GetMicroBall(const std::string &reaction)
 {
     Microball *uBall = new Microball();
     fs::path project_dir = std::getenv("PROJECT_DIR");
     fs::path database_dir = project_dir / "database/e15190/microball/acceptance";
-    fs::path path_config = path_base / "config.dat";
-    fs::path path_geo = path_base / "geometry.dat";
+    fs::path path_config = database_dir / "config.dat";
+    fs::path path_geometry = database_dir / "geometry.dat";
 
     std::map<int, fs::path> path_thres;
-    path_thres[2] = path_base / "threshold_Sn_65mgcm2.dat";
-    path_thres[3] = path_base / "threshold_Sn_58mgcm2.dat";
-    path_thres[4] = path_base / "threshold_Sn_50mgcm2.dat";
-    path_thres[5] = path_base / "threshold_Sn_43mgcm2.dat";
-    path_thres[7] = path_base / "threshold_Sn_30mgcm2.dat";
-    path_thres[8] = path_base / "threshold_Sn_23mgcm2.dat";
+    path_thres[2] = database_dir / "threshold_Sn_65mgcm2.dat";
+    path_thres[3] = database_dir / "threshold_Sn_58mgcm2.dat";
+    path_thres[4] = database_dir / "threshold_Sn_50mgcm2.dat";
+    path_thres[5] = database_dir / "threshold_Sn_43mgcm2.dat";
+    path_thres[7] = database_dir / "threshold_Sn_30mgcm2.dat";
+    path_thres[8] = database_dir / "threshold_Sn_23mgcm2.dat";
 
-    uBall->ReadGeometry(path_geo.string());
+    uBall->ReadGeometry(path_geometry.string());
 
     for (auto &[id, pth] : path_thres)
     {
@@ -92,7 +49,7 @@ Microball *GetMicroBall(const std::string &reaction)
     return uBall;
 }
 
-void ReadParticle(Microball *&uBall, const particle &particle)
+void ReadMicroballParticle(Microball *&uBall, const particle &particle)
 {
     if (
         uBall->IsChargedParticle(particle.zid) &&
@@ -102,4 +59,9 @@ void ReadParticle(Microball *&uBall, const particle &particle)
         uBall->AddCsIHit(particle.thetalab, particle.phi);
     }
     return;
+}
+
+bool ReadHiRAParticle(HiRA *&hira, const particle &particle)
+{
+    return hira->PassAngularCut(particle.thetalab, particle.phi) && hira->PassCharged(particle.zid) && hira->PassKinergyCut(particle.name, particle.ekinlab);
 }

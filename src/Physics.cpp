@@ -69,6 +69,18 @@ namespace Physics
     double amu_MeV = 931.49410242;
 };
 
+std::string Physics::GetNucleiName(const int &Z, const int &A)
+{
+    for (auto &[pn, a] : Physics::particle_A)
+    {
+        if (A == a && Z == Physics::particle_Z[pn])
+        {
+            return pn;
+        }
+    }
+    return "no-such-particle";
+}
+
 double Physics::GetNucleiMass(const std::string &symbol, const std::string &option)
 {
     return option == "new" ? Physics::particle_mass[symbol] : Physics::particle_mass_old[symbol] * Physics::amu_MeV;

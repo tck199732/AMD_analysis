@@ -72,9 +72,8 @@ int main(int argc, char *argv[])
     histograms3.init();
     histograms3_single_decay.init();
 
-    system_info *ReactionInfo = new system_info();
-    double betacms = ReactionInfo->get_betacms(reaction);
-    double beam_rapidity = ReactionInfo->get_rapidity_beam(reaction);
+    double betacms = Physics::GetReactionBeta(reaction);
+    double beam_rapidity = Physics::GetBeamRapidity(reaction);
 
     EventCut event_cut = {{Ncmin, Ncmax}, {bmin, bmax}};
 
@@ -88,7 +87,7 @@ int main(int argc, char *argv[])
     {
         chain3->GetEntry(ievt3);
 
-        Event event3 = {DATASTRUCT.Nc, DATASTRUCT.b};
+        Event event3 = {AMD.Nc, AMD.b};
         if (event_cut.pass(event3))
         {
             histograms3.norm += 1. / NDECAYS;
@@ -105,7 +104,7 @@ int main(int argc, char *argv[])
 
         for (unsigned int i = 0; i < event3.multi; i++)
         {
-            particle particle = {DATASTRUCT.N[i], DATASTRUCT.Z[i], DATASTRUCT.px[i], DATASTRUCT.py[i], DATASTRUCT.pz[i]};
+            particle particle = {AMD.N[i], AMD.Z[i], AMD.px[i], AMD.py[i], AMD.pz[i]};
             particle.autofill(betacms, beam_rapidity);
 
             if (ievt3 < nevents3 / NDECAYS)
@@ -124,11 +123,11 @@ int main(int argc, char *argv[])
         chain21->GetEntry(ievt21);
         weights[ievt21] /= 1.0 * NDECAYS;
 
-        Event event21 = {DATASTRUCT.Nc, DATASTRUCT.b};
+        Event event21 = {AMD.Nc, AMD.b};
 
         for (unsigned int i = 0; i < event21.multi; i++)
         {
-            particle particle = {DATASTRUCT.N[i], DATASTRUCT.Z[i], DATASTRUCT.px[i], DATASTRUCT.py[i], DATASTRUCT.pz[i]};
+            particle particle = {AMD.N[i], AMD.Z[i], AMD.px[i], AMD.py[i], AMD.pz[i]};
             particle.autofill(betacms, beam_rapidity);
             histograms21.fill(particle, weights[ievt21]);
         }

@@ -1,4 +1,4 @@
-#include "../src/system_info.cpp"
+#include "../src/Physics.cpp"
 #include "../src/particle.cpp"
 
 #include <array>
@@ -15,7 +15,7 @@ namespace fs = std::filesystem;
 
 const int NDECAYS = 10; // 10 decay events generated from each primary event
 
-struct data_structure
+struct AMD_Structure
 {
     const static int NMAX = 128;
     int multi, Nc;
@@ -32,7 +32,7 @@ struct data_structure
     std::array<double, NMAX> z;
 };
 
-data_structure DATASTRUCT;
+AMD_Structure AMD;
 
 void Initialize_TChain(TChain *&chain, const std::vector<std::string> &input_pths, const std::string &analysis = "default", const std::string &mode = "3")
 {
@@ -47,21 +47,22 @@ void Initialize_TChain(TChain *&chain, const std::vector<std::string> &input_pth
     }
     if (analysis == "filtered")
     {
-        chain->SetBranchAddress("Nc", &DATASTRUCT.Nc);
+        chain->SetBranchAddress("Nc", &AMD.Nc);
     }
-    chain->SetBranchAddress("multi", &DATASTRUCT.multi);
-    chain->SetBranchAddress("b", &DATASTRUCT.b);
-    chain->SetBranchAddress("px", &DATASTRUCT.px[0]);
-    chain->SetBranchAddress("py", &DATASTRUCT.py[0]);
-    chain->SetBranchAddress("pz", &DATASTRUCT.pz[0]);
+    chain->SetBranchAddress("multi", &AMD.multi);
+    chain->SetBranchAddress("b", &AMD.b);
+    chain->SetBranchAddress("px", &AMD.px[0]);
+    chain->SetBranchAddress("py", &AMD.py[0]);
+    chain->SetBranchAddress("pz", &AMD.pz[0]);
 
-    chain->SetBranchAddress("N", &DATASTRUCT.N[0]);
-    chain->SetBranchAddress("Z", &DATASTRUCT.Z[0]);
+    chain->SetBranchAddress("N", &AMD.N[0]);
+    chain->SetBranchAddress("Z", &AMD.Z[0]);
+
     if (mode == "21t")
     {
-        chain->SetBranchAddress("t", &DATASTRUCT.t[0]);
-        chain->SetBranchAddress("x", &DATASTRUCT.x[0]);
-        chain->SetBranchAddress("y", &DATASTRUCT.y[0]);
-        chain->SetBranchAddress("z", &DATASTRUCT.z[0]);
+        chain->SetBranchAddress("t", &AMD.t[0]);
+        chain->SetBranchAddress("x", &AMD.x[0]);
+        chain->SetBranchAddress("y", &AMD.y[0]);
+        chain->SetBranchAddress("z", &AMD.z[0]);
     }
 }

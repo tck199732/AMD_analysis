@@ -76,9 +76,8 @@ int main(int argc, char *argv[])
     Histograms histograms;
     histograms.init();
 
-    system_info *ReactionInfo = new system_info();
-    double betacms = ReactionInfo->get_betacms(reaction);
-    double beam_rapidity = ReactionInfo->get_rapidity_beam(reaction);
+    double betacms = Physics::GetReactionBeta(reaction);
+    double beam_rapidity = Physics::GetBeamRapidity(reaction);
 
     // count the number particles with emission time <= 0. (tested all are 0 not negative);
     long count_neg_time = 0;
@@ -88,10 +87,10 @@ int main(int argc, char *argv[])
     {
         chain->GetEntry(ievt);
 
-        for (unsigned int i = 0; i < DATASTRUCT.multi; i++)
+        for (unsigned int i = 0; i < AMD.multi; i++)
         {
-            particle particle = {DATASTRUCT.N[i], DATASTRUCT.Z[i], DATASTRUCT.px[i], DATASTRUCT.py[i], DATASTRUCT.pz[i]};
-            particle.set_xyzt(DATASTRUCT.x[i], DATASTRUCT.y[i], DATASTRUCT.z[i], DATASTRUCT.t[i]);
+            particle particle = {AMD.N[i], AMD.Z[i], AMD.px[i], AMD.py[i], AMD.pz[i]};
+            particle.set_xyzt(AMD.x[i], AMD.y[i], AMD.z[i], AMD.t[i]);
             particle.autofill(betacms);
 
             if (particle.t <= 0.0)

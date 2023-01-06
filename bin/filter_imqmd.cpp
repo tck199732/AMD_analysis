@@ -91,12 +91,11 @@ int main(int argc, char *argv[])
     TChain *chain = new TChain("cluster");
     Initialize_TChain(chain, input_pths);
 
-    system_info *ReactionInfo = new system_info();
-    double betacms = ReactionInfo->get_betacms(reaction);
-    double rapidity_beam = ReactionInfo->get_rapidity_beam(reaction);
+    double betacms = Physics::GetReactionBeta(reaction);
+    double rapidity_beam = Physics::GetBeamRapidity(reaction);
 
-    MicroBall *uball_detector = new MicroBall();
-    uball_detector->Configurate(reaction);
+    Microball *uball_detector = GetMicroBall(reaction);
+    HiRA *hira_detector = new HiRA();
 
     TTree *tree = new TTree("cluster", "");
     Initialize_TTree(tree);
@@ -104,9 +103,8 @@ int main(int argc, char *argv[])
     for (int ievt = 0; ievt < chain->GetEntries(); ievt++)
     {
         chain->GetEntry(ievt);
-        filtered_imqmd.multi = imqmd.multi;
-        filtered_imqmd.b_fm = imqmd.b_fm;
-        uball_detector->Reset();
+
+        uball_detector->ResetCsI();
 
         int hira_counts = 0;
         for (unsigned int i = 0; i < imqmd.multi; i++)
@@ -114,9 +112,9 @@ int main(int argc, char *argv[])
             particle particle = {imqmd.A[i] - imqmd.Z[i], imqmd.Z[i], imqmd.px_MeV[i] / imqmd.A[i], imqmd.py_MeV[i] / imqmd.A[i], imqmd.pz_MeV[i] / imqmd.A[i]};
 
             particle.autofill(betacms, rapidity_beam);
-            uball_detector->ReadParticle(particle);
+            ReadMicroballParticle(uball_detector, particle);
 
-            if (hira_detector.pass_angle(particle) && hira_detector.pass_ekinlab(particle))
+            if (ReadHiRAParticle(hira_detector, particle))
             {
                 filtered_imqmd.id[hira_counts] = imqmd.id[i];
                 filtered_imqmd.A[hira_counts] = imqmd.A[i];
@@ -131,7 +129,9 @@ int main(int argc, char *argv[])
             }
         }
 
-        filtered_imqmd.Nc = uball_detector->GetNumberOfChargedParticles();
+        filtered_imqmd.multi = hira_counts;
+        filtered_imqmd.b_fm = imqmd.b_fm;
+        filtered_imqmd.Nc = uball_detector->GetCsIHits();
         tree->Fill();
     }
 

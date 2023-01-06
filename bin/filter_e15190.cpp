@@ -111,11 +111,11 @@ int main(int argc, char *argv[])
     TChain *chain = new TChain("AMD");
     Initialize_TChain(chain, input_pths);
 
-    system_info *ReactionInfo = new system_info();
-    double betacms = ReactionInfo->get_betacms(reaction);
-    double rapidity_beam = ReactionInfo->get_rapidity_beam(reaction);
+    double betacms = Physics::GetReactionBeta(reaction);
+    double rapidity_beam = Physics::GetBeamRapidity(reaction);
 
     Microball *uball_detector = GetMicroBall(reaction);
+    HiRA *hira_detector = new HiRA();
 
     TTree *tree = new TTree("AMD", "");
     Initialize_TTree(tree);
@@ -124,8 +124,6 @@ int main(int argc, char *argv[])
     {
         chain->GetEntry(ievt);
 
-        filtered_amd.multi = amd.multi;
-        filtered_amd.b = amd.b;
         uball_detector->ResetCsI();
 
         int hira_counts = 0;
@@ -134,8 +132,8 @@ int main(int argc, char *argv[])
             particle particle = {amd.N[i], amd.Z[i], amd.px[i], amd.py[i], amd.pz[i]};
             particle.autofill(betacms, rapidity_beam);
 
-            ReadParticle(uball_detector, particle);
-            if (hira_detector.pass_angle(particle) && hira_detector.pass_ekinlab(particle))
+            ReadMicroballParticle(uball_detector, particle);
+            if (ReadHiRAParticle(hira_detector, particle))
             {
                 filtered_amd.N[hira_counts] = amd.N[i];
                 filtered_amd.Z[hira_counts] = amd.Z[i];
@@ -148,11 +146,11 @@ int main(int argc, char *argv[])
                 filtered_amd.M[hira_counts] = amd.M[i];
                 filtered_amd.WEIGHT[hira_counts] = amd.WEIGHT[i];
                 filtered_amd.iFRG[hira_counts] = amd.iFRG[i];
-
                 hira_counts++;
             }
         }
 
+        filtered_amd.multi = hira_counts;
         filtered_amd.Nc = uball_detector->GetCsIHits();
         filtered_amd.b = amd.b;
         tree->Fill();

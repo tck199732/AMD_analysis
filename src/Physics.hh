@@ -20,6 +20,7 @@ namespace Physics
     extern std::map<std::string, int> particle_A;
     extern std::map<std::string, int> particle_Z;
 
+    std::string GetNucleiName(const int &Z, const int &A);
     double GetBeamRapidity(const std::string &reaction, const std::string &option = "new");
     double GetReactionBeta(const std::string &reaction, const std::string &option = "new");
     double GetBeamRapidity(const std::string &beam, const int &beamEperA, const std::string &option = "new");
