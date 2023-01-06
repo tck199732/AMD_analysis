@@ -46,6 +46,9 @@ public:
     void SetThetaCut(const double &, const double &);
     void SetPhiCut(const double &, const double &);
 
+    void ResetCounter() { mCounterPass = mCounterFail = 0; }
+    long GetCountPass() { return mCounterPass; }
+    long GetCountFail() { return mCounterFail; }
     void CountPass() { mCounterPass++; }
     void CountFail() { mCounterFail++; }
 

@@ -49,16 +49,11 @@ Microball *GetMicroBall(const std::string &reaction)
     return uBall;
 }
 
-void ReadMicroballParticle(Microball *&uBall, const particle &particle)
+bool ReadMicroballParticle(Microball *&uBall, const particle &particle)
 {
-    if (
-        uBall->IsChargedParticle(particle.zid) &&
-        uBall->IsCovered(particle.thetalab, particle.phi) &&
-        uBall->IsAccepted(particle.ekinlab, particle.thetalab, particle.aid, particle.zid) && uBall->IsReadyCsI(particle.thetalab, particle.phi))
-    {
-        uBall->AddCsIHit(particle.thetalab, particle.phi);
-    }
-    return;
+    return uBall->IsChargedParticle(particle.zid) &&
+           uBall->IsCovered(particle.thetalab, particle.phi) &&
+           uBall->IsAccepted(particle.ekinlab, particle.thetalab, particle.aid, particle.zid) && uBall->IsReadyCsI(particle.thetalab, particle.phi);
 }
 
 bool ReadHiRAParticle(HiRA *&hira, const particle &particle)

@@ -31,9 +31,42 @@ struct AMD
     // std::array<double, MAX_MULTI> y;
     // std::array<double, MAX_MULTI> z;
 };
+struct E15190
+{
+    const static int MAX_MULTI = 128;
+    // impact parameter
+    double b;
+
+    // microball
+    int uball_multi;
+    std::array<int, MAX_MULTI> uball_N;
+    std::array<int, MAX_MULTI> uball_Z;
+    std::array<double, MAX_MULTI> uball_px;
+    std::array<double, MAX_MULTI> uball_py;
+    std::array<double, MAX_MULTI> uball_pz;
+    std::array<double, MAX_MULTI> uball_J;
+    std::array<double, MAX_MULTI> uball_M;
+    std::array<double, MAX_MULTI> uball_WEIGHT;
+    std::array<int, MAX_MULTI> uball_iFRG;
+
+    // hira
+    int hira_multi;
+    std::array<int, MAX_MULTI> hira_N;
+    std::array<int, MAX_MULTI> hira_Z;
+    std::array<double, MAX_MULTI> hira_px;
+    std::array<double, MAX_MULTI> hira_py;
+    std::array<double, MAX_MULTI> hira_pz;
+    std::array<double, MAX_MULTI> hira_J;
+    std::array<double, MAX_MULTI> hira_M;
+    std::array<double, MAX_MULTI> hira_WEIGHT;
+    std::array<int, MAX_MULTI> hira_iFRG;
+
+    // veto wall
+    // neutron wall
+};
 
 AMD amd;
-AMD filtered_amd;
+E15190 filtered_amd;
 
 void Initialize_TChain(TChain *&chain, const std::vector<std::string> &pths)
 {
@@ -80,19 +113,32 @@ void Initialize_TChain(TChain *&chain, const std::vector<std::string> &pths)
 
 void Initialize_TTree(TTree *&tree)
 {
-    tree->Branch("multi", &filtered_amd.multi, "multi/I");
-    tree->Branch("Nc", &filtered_amd.Nc, "Nc/I");
-    tree->Branch("b", &filtered_amd.b, "b_fm/D");
-    tree->Branch("N", &filtered_amd.N[0], "N[Nc]/I");
-    tree->Branch("Z", &filtered_amd.Z[0], "Z[Nc]/I");
-    tree->Branch("px", &filtered_amd.px[0], "px[Nc]/D");
-    tree->Branch("py", &filtered_amd.py[0], "py[Nc]/D");
-    tree->Branch("pz", &filtered_amd.pz[0], "pz[Nc]/D");
-    // table3
-    tree->Branch("J", &filtered_amd.J[0], "J[Nc]/D");
-    tree->Branch("M", &filtered_amd.M[0], "M[Nc]/D");
-    tree->Branch("WEIGHT", &filtered_amd.WEIGHT[0], "WEIGHT[Nc]/D");
-    tree->Branch("iFRG", &filtered_amd.iFRG[0], "iFRG[Nc]/D");
+    // impact parameter
+    tree->Branch("b", &filtered_amd.b, "b/D");
+
+    // microball
+    tree->Branch("uball_multi", &filtered_amd.uball_multi, "uball_multi/I");
+    tree->Branch("uball_N", &filtered_amd.uball_N[0], "uball_N[uball_multi]/I");
+    tree->Branch("uball_Z", &filtered_amd.uball_Z[0], "uball_Z[uball_multi]/I");
+    tree->Branch("uball_px", &filtered_amd.uball_px[0], "uball_px[uball_multi]/D");
+    tree->Branch("uball_py", &filtered_amd.uball_py[0], "uball_py[uball_multi]/D");
+    tree->Branch("uball_pz", &filtered_amd.uball_pz[0], "uball_pz[uball_multi]/D");
+    tree->Branch("uball_J", &filtered_amd.uball_J[0], "uball_J[uball_multi]/D");
+    tree->Branch("uball_M", &filtered_amd.uball_M[0], "uball_M[uball_multi]/D");
+    tree->Branch("uball_WEIGHT", &filtered_amd.uball_WEIGHT[0], "uball_WEIGHT[uball_multi]/D");
+    tree->Branch("uball_iFRG", &filtered_amd.uball_iFRG[0], "uball_iFRG[uball_multi]/D");
+
+    // hira
+    tree->Branch("hira_multi", &filtered_amd.hira_multi, "hira_multi/I");
+    tree->Branch("hira_N", &filtered_amd.hira_N[0], "hira_N[hira_multi]/I");
+    tree->Branch("hira_Z", &filtered_amd.hira_Z[0], "hira_Z[hira_multi]/I");
+    tree->Branch("hira_px", &filtered_amd.hira_px[0], "hira_px[hira_multi]/D");
+    tree->Branch("hira_py", &filtered_amd.hira_py[0], "hira_py[hira_multi]/D");
+    tree->Branch("hira_pz", &filtered_amd.hira_pz[0], "hira_pz[hira_multi]/D");
+    tree->Branch("hira_J", &filtered_amd.hira_J[0], "hira_J[hira_multi]/D");
+    tree->Branch("hira_M", &filtered_amd.hira_M[0], "hira_M[hira_multi]/D");
+    tree->Branch("hira_WEIGHT", &filtered_amd.hira_WEIGHT[0], "hira_WEIGHT[hira_multi]/D");
+    tree->Branch("hira_iFRG", &filtered_amd.hira_iFRG[0], "hira_iFRG[hira_multi]/D");
 }
 
 int main(int argc, char *argv[])
@@ -125,33 +171,51 @@ int main(int argc, char *argv[])
         chain->GetEntry(ievt);
 
         uball_detector->ResetCsI();
-
-        int hira_counts = 0;
+        hira_detector->ResetCounter();
         for (unsigned int i = 0; i < amd.multi; i++)
         {
             particle particle = {amd.N[i], amd.Z[i], amd.px[i], amd.py[i], amd.pz[i]};
             particle.autofill(betacms, rapidity_beam);
 
-            ReadMicroballParticle(uball_detector, particle);
-            if (ReadHiRAParticle(hira_detector, particle))
+            int uball_multi = uball_detector->GetCsIHits();
+            int hira_multi = hira_detector->GetCountPass();
+
+            if (ReadMicroballParticle(uball_detector, particle))
             {
-                filtered_amd.N[hira_counts] = amd.N[i];
-                filtered_amd.Z[hira_counts] = amd.Z[i];
-                filtered_amd.px[hira_counts] = amd.px[i];
-                filtered_amd.py[hira_counts] = amd.py[i];
-                filtered_amd.pz[hira_counts] = amd.pz[i];
+                filtered_amd.uball_N[uball_multi] = amd.N[i];
+                filtered_amd.uball_Z[uball_multi] = amd.Z[i];
+                filtered_amd.uball_px[uball_multi] = amd.px[i];
+                filtered_amd.uball_py[uball_multi] = amd.py[i];
+                filtered_amd.uball_pz[uball_multi] = amd.pz[i];
 
                 // table3
-                filtered_amd.J[hira_counts] = amd.J[i];
-                filtered_amd.M[hira_counts] = amd.M[i];
-                filtered_amd.WEIGHT[hira_counts] = amd.WEIGHT[i];
-                filtered_amd.iFRG[hira_counts] = amd.iFRG[i];
-                hira_counts++;
+                filtered_amd.uball_J[uball_multi] = amd.J[i];
+                filtered_amd.uball_M[uball_multi] = amd.M[i];
+                filtered_amd.uball_WEIGHT[uball_multi] = amd.WEIGHT[i];
+                filtered_amd.uball_iFRG[uball_multi] = amd.iFRG[i];
+
+                uball_detector->AddCsIHit(particle.thetalab, particle.phi);
+            }
+
+            if (ReadHiRAParticle(hira_detector, particle))
+            {
+                filtered_amd.hira_N[hira_multi] = amd.N[i];
+                filtered_amd.hira_Z[hira_multi] = amd.Z[i];
+                filtered_amd.hira_px[hira_multi] = amd.px[i];
+                filtered_amd.hira_py[hira_multi] = amd.py[i];
+                filtered_amd.hira_pz[hira_multi] = amd.pz[i];
+
+                // table3
+                filtered_amd.hira_J[hira_multi] = amd.J[i];
+                filtered_amd.hira_M[hira_multi] = amd.M[i];
+                filtered_amd.hira_WEIGHT[hira_multi] = amd.WEIGHT[i];
+                filtered_amd.hira_iFRG[hira_multi] = amd.iFRG[i];
+                hira_detector->CountPass();
             }
         }
 
-        filtered_amd.multi = hira_counts;
-        filtered_amd.Nc = uball_detector->GetCsIHits();
+        filtered_amd.hira_multi = hira_detector->GetCountPass();
+        filtered_amd.uball_multi = uball_detector->GetCsIHits();
         filtered_amd.b = amd.b;
         tree->Fill();
     }
