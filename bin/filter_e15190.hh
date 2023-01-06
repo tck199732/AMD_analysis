@@ -1,6 +1,6 @@
 #include "../src/system_info.cpp"
-#include "../src/detector_uball.cpp"
 #include "../src/particle.cpp"
+#include "../src/Microball.cpp"
 
 #include "TChain.h"
 #include "TFile.h"
@@ -8,6 +8,7 @@
 
 #include <vector>
 #include <string>
+#include <stdlib.h>
 #include <map>
 #include <filesystem>
 namespace fs = std::filesystem;
@@ -56,107 +57,49 @@ bool HiRA::pass_angle(const particle &particle)
 
 HiRA hira_detector;
 
-class MicroBall
+Microball *GetMicroBall(const std::string &reaction)
 {
-public:
-    MicroBall();
-    ~MicroBall();
-    void Configurate(const std::string &system);
-    void Reset();
-    void ReadParticle(const particle &particle);
-    int GetNumberOfChargedParticles() { return this->counter; }
+    Microball *uBall = new Microball();
+    fs::path project_dir = std::getenv("PROJECT_DIR");
+    fs::path database_dir = project_dir / "database/e15190/microball/acceptance";
+    fs::path path_config = path_base / "config.dat";
+    fs::path path_geo = path_base / "geometry.dat";
 
-private:
-    fs::path path_config, path_geo;
     std::map<int, fs::path> path_thres;
-    detector_uball *uball;
-    int counter = 0;
-};
+    path_thres[2] = path_base / "threshold_Sn_65mgcm2.dat";
+    path_thres[3] = path_base / "threshold_Sn_58mgcm2.dat";
+    path_thres[4] = path_base / "threshold_Sn_50mgcm2.dat";
+    path_thres[5] = path_base / "threshold_Sn_43mgcm2.dat";
+    path_thres[7] = path_base / "threshold_Sn_30mgcm2.dat";
+    path_thres[8] = path_base / "threshold_Sn_23mgcm2.dat";
 
-MicroBall::MicroBall()
-{
-    fs::path path_base = "../database/e15190/microball/acceptance";
-    this->path_config = path_base / "config.dat";
-    this->path_geo = path_base / "geometry.dat";
-    this->path_thres[2] = path_base / "threshold_Sn_65mgcm2.dat";
-    this->path_thres[3] = path_base / "threshold_Sn_58mgcm2.dat";
-    this->path_thres[4] = path_base / "threshold_Sn_50mgcm2.dat";
-    this->path_thres[5] = path_base / "threshold_Sn_43mgcm2.dat";
-    this->path_thres[7] = path_base / "threshold_Sn_30mgcm2.dat";
-    this->path_thres[8] = path_base / "threshold_Sn_23mgcm2.dat";
+    uBall->ReadGeometry(path_geo.string());
 
-    this->uball = new detector_uball();
-    this->uball->read_geometry(fs::absolute(this->path_geo));
-
-    for (auto &[id, pth] : this->path_thres)
+    for (auto &[id, pth] : path_thres)
     {
         if (!fs ::exists(pth))
         {
             std::string msg = Form("%s does not exists.", pth.c_str());
             throw std::invalid_argument(msg.c_str());
         }
-        this->uball->read_threshold(id, fs::absolute(pth));
+        uBall->ReadThreshold(id, pth.string());
     }
 
-    this->uball->hira_coordinate(); // add phi angle by 90, and move to phi=[0,360];
+    uBall->ReadConfiguration(reaction, path_config.string());
+
+    uBall->HiRA_Coordinate(); // add phi angle by 90, and move to phi=[0,360];
+
+    return uBall;
 }
 
-MicroBall::~MicroBall() { delete this->uball; }
-
-void MicroBall::Configurate(const std::string &system)
+void ReadParticle(Microball *&uBall, const particle &particle)
 {
-    std::ifstream stream(fs::absolute(this->path_config));
-    stream.ignore(99, '\n');
-    std::string line;
-    while (std::getline(stream, line))
+    if (
+        uBall->IsChargedParticle(particle.zid) &&
+        uBall->IsCovered(particle.thetalab, particle.phi) &&
+        uBall->IsAccepted(particle.ekinlab, particle.thetalab, particle.aid, particle.zid) && uBall->IsReadyCsI(particle.thetalab, particle.phi))
     {
-        std::istringstream iss(line);
-        std::string sys;
-        int ring_id, det_id;
-        iss >> sys >> ring_id;
-        if (sys != system)
-        {
-            continue;
-        }
-
-        std::vector<int> det_array;
-        while (iss >> det_id)
-        {
-            det_array.push_back(det_id);
-        }
-
-        for (int i = 0; i < 15; i++)
-        {
-            if (std::find(det_array.begin(), det_array.end(), i) - det_array.begin() == det_array.size())
-            {
-                this->uball->remove_csi(ring_id, i);
-            }
-        }
-    }
-}
-
-void MicroBall::Reset()
-{
-    this->uball->reset_csi();
-    this->counter = 0;
-}
-
-void MicroBall::ReadParticle(const particle &particle)
-{
-    if (particle.zid == 0)
-    {
-        return;
-    }
-    if (this->uball->cover(particle.thetalab, particle.phi))
-    {
-        if (this->uball->punch_thr(particle.ekinlab, particle.thetalab, particle.aid, particle.zid))
-        {
-            if (this->uball->ready_csi(particle.thetalab, particle.phi))
-            {
-                this->counter++;
-                this->uball->add_csi_hit(particle.thetalab, particle.phi);
-            }
-        }
+        uBall->AddCsIHit(particle.thetalab, particle.phi);
     }
     return;
 }
