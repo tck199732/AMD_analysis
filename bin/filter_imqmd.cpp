@@ -107,9 +107,9 @@ void Initialize_TTree(TTree *&tree)
     tree->Branch("uball_pz", &filtered_imqmd.uball_pz[0], "uball_pz[uball_multi]/D");
 
     tree->Branch("uball_id", &filtered_imqmd.uball_id[0], "uball_id[uball_multi]/I");
-    tree->Branch("uball_x_fm", &filtered_imqmd.uball_x[0], "uball_x[uball_multi]/D");
-    tree->Branch("uball_y_fm", &filtered_imqmd.uball_y[0], "uball_y[uball_multi]/D");
-    tree->Branch("uball_z_fm", &filtered_imqmd.uball_z[0], "uball_z[uball_multi]/D");
+    tree->Branch("uball_x", &filtered_imqmd.uball_x[0], "uball_x[uball_multi]/D");
+    tree->Branch("uball_y", &filtered_imqmd.uball_y[0], "uball_y[uball_multi]/D");
+    tree->Branch("uball_z", &filtered_imqmd.uball_z[0], "uball_z[uball_multi]/D");
 
     // hira
     tree->Branch("hira_multi", &filtered_imqmd.hira_multi, "hira_multi/I");
@@ -159,8 +159,8 @@ int main(int argc, char *argv[])
 
         for (unsigned int i = 0; i < imqmd.multi; i++)
         {
-            particle particle = {imqmd.A[i] - imqmd.Z[i], imqmd.Z[i], imqmd.px_MeV[i] / imqmd.A[i], imqmd.py_MeV[i] / imqmd.A[i], imqmd.pz_MeV[i] / imqmd.A[i]};
-            particle.autofill(betacms, rapidity_beam);
+            particle particle = {imqmd.A[i] - imqmd.Z[i], imqmd.Z[i], imqmd.px_MeV[i], imqmd.py_MeV[i], imqmd.pz_MeV[i]};
+            particle.initialize(betacms);
 
             int uball_multi = uball_detector->GetCsIHits();
             int hira_multi = hira_detector->GetCountPass();
@@ -177,7 +177,7 @@ int main(int argc, char *argv[])
                 filtered_imqmd.uball_py[uball_multi] = imqmd.py_MeV[i];
                 filtered_imqmd.uball_pz[uball_multi] = imqmd.pz_MeV[i];
 
-                uball_detector->AddCsIHit(particle.thetalab, particle.phi);
+                uball_detector->AddCsIHit(particle.theta_lab, particle.phi);
             }
 
             if (ReadHiRAParticle(hira_detector, particle))

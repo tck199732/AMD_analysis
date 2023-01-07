@@ -158,7 +158,7 @@ int main(int argc, char *argv[])
     Initialize_TChain(chain, input_pths);
 
     double betacms = Physics::GetReactionBeta(reaction);
-    double rapidity_beam = Physics::GetBeamRapidity(reaction);
+    double rapidity_beam = Physics::GetBeamRapidity(reaction); // not needed
 
     Microball *uball_detector = GetMicroBall(reaction);
     HiRA *hira_detector = new HiRA();
@@ -174,8 +174,13 @@ int main(int argc, char *argv[])
         hira_detector->ResetCounter();
         for (unsigned int i = 0; i < amd.multi; i++)
         {
-            particle particle = {amd.N[i], amd.Z[i], amd.px[i], amd.py[i], amd.pz[i]};
-            particle.autofill(betacms, rapidity_beam);
+            int A = amd.N[i] + amd.Z[i];
+            double px = amd.px[i] * A;
+            double py = amd.py[i] * A;
+            double pz_cms = amd.pz[i] * A;
+
+            particle particle = {amd.N[i], amd.Z[i], px, py, pz_cms};
+            particle.initialize(betacms);
 
             int uball_multi = uball_detector->GetCsIHits();
             int hira_multi = hira_detector->GetCountPass();
@@ -184,9 +189,9 @@ int main(int argc, char *argv[])
             {
                 filtered_amd.uball_N[uball_multi] = amd.N[i];
                 filtered_amd.uball_Z[uball_multi] = amd.Z[i];
-                filtered_amd.uball_px[uball_multi] = amd.px[i];
-                filtered_amd.uball_py[uball_multi] = amd.py[i];
-                filtered_amd.uball_pz[uball_multi] = amd.pz[i];
+                filtered_amd.uball_px[uball_multi] = px;
+                filtered_amd.uball_py[uball_multi] = py;
+                filtered_amd.uball_pz[uball_multi] = pz_cms;
 
                 // table3
                 filtered_amd.uball_J[uball_multi] = amd.J[i];
@@ -194,16 +199,16 @@ int main(int argc, char *argv[])
                 filtered_amd.uball_WEIGHT[uball_multi] = amd.WEIGHT[i];
                 filtered_amd.uball_iFRG[uball_multi] = amd.iFRG[i];
 
-                uball_detector->AddCsIHit(particle.thetalab, particle.phi);
+                uball_detector->AddCsIHit(particle.theta_lab, particle.phi);
             }
 
             if (ReadHiRAParticle(hira_detector, particle))
             {
                 filtered_amd.hira_N[hira_multi] = amd.N[i];
                 filtered_amd.hira_Z[hira_multi] = amd.Z[i];
-                filtered_amd.hira_px[hira_multi] = amd.px[i];
-                filtered_amd.hira_py[hira_multi] = amd.py[i];
-                filtered_amd.hira_pz[hira_multi] = amd.pz[i];
+                filtered_amd.hira_px[hira_multi] = px;
+                filtered_amd.hira_py[hira_multi] = py;
+                filtered_amd.hira_pz[hira_multi] = pz_cms;
 
                 // table3
                 filtered_amd.hira_J[hira_multi] = amd.J[i];

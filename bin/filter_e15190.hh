@@ -1,5 +1,4 @@
 #include "../src/Physics.cpp"
-#include "../src/particle.cpp"
 #include "../src/Microball.cpp"
 #include "../src/HiRA.cpp"
 
@@ -13,6 +12,46 @@
 #include <map>
 #include <filesystem>
 namespace fs = std::filesystem;
+
+/**
+ * @brief Input the N, Z and momenta (not per nucleon !)
+ *
+ */
+struct particle
+{
+    int N, Z;
+    double px, py, pz_cms;
+    double kinergy_lab;
+    double theta_lab, phi;
+    void initialize(const double &betacms);
+};
+
+void particle::initialize(const double &betacms)
+{
+    double mass = Physics::GetNucleiMass(this->Z, this->N + this->Z);
+    double gamma = 1. / TMath::Sqrt(1 - pow(betacms, 2.));
+    double pmag_trans = TMath::Sqrt(pow(this->px, 2.) + pow(this->py, 2.));
+    double pmag_cms = TMath::Sqrt(pow(pmag_trans, 2.) + pow(this->pz_cms, 2.));
+
+    double kinergy_cms = TMath::Sqrt(pow(pmag_cms, 2.) + pow(mass, 2.)) - mass;
+
+    double pz_lab = gamma * (this->pz_cms + betacms * (kinergy_cms + mass));
+    double pmag_lab = TMath::Sqrt(pow(pmag_trans, 2.) + pow(pz_lab, 2.));
+
+    this->theta_lab = TMath::ATan2(pmag_trans, pz_lab) * TMath::RadToDeg();
+
+    this->kinergy_lab = TMath::Sqrt(pow(pmag_lab, 2.) + pow(mass, 2.)) - mass;
+    this->phi = TMath::ATan2(this->py, this->px) * TMath::RadToDeg();
+
+    if (this->phi < 0)
+    {
+        this->phi += 360.;
+    }
+    if (this->phi > 360)
+    {
+        this->phi -= 360.;
+    }
+}
 
 Microball *GetMicroBall(const std::string &reaction)
 {
@@ -51,12 +90,12 @@ Microball *GetMicroBall(const std::string &reaction)
 
 bool ReadMicroballParticle(Microball *&uBall, const particle &particle)
 {
-    return uBall->IsChargedParticle(particle.zid) &&
-           uBall->IsCovered(particle.thetalab, particle.phi) &&
-           uBall->IsAccepted(particle.ekinlab, particle.thetalab, particle.aid, particle.zid) && uBall->IsReadyCsI(particle.thetalab, particle.phi);
+    return uBall->IsChargedParticle(particle.Z) &&
+           uBall->IsCovered(particle.theta_lab, particle.phi) &&
+           uBall->IsAccepted(particle.kinergy_lab, particle.theta_lab, particle.N + particle.Z, particle.Z) && uBall->IsReadyCsI(particle.theta_lab, particle.phi);
 }
 
 bool ReadHiRAParticle(HiRA *&hira, const particle &particle)
 {
-    return hira->PassAngularCut(particle.thetalab, particle.phi) && hira->PassCharged(particle.zid) && hira->PassKinergyCut(particle.name, particle.ekinlab);
+    return hira->PassAngularCut(particle.theta_lab, particle.phi) && hira->PassCharged(particle.Z) && hira->PassKinergyCut(particle.Z + particle.N, particle.Z, particle.kinergy_lab);
 }

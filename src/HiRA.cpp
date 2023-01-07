@@ -21,3 +21,12 @@ bool HiRA::PassKinergyCut(const std::string &particle_name, const double &kinerg
 {
     return this->mKinergyCut.count(particle_name) == 1 && kinergy_per_nucleon >= this->mKinergyCut[particle_name][0] && kinergy_per_nucleon <= this->mKinergyCut[particle_name][1];
 }
+
+bool HiRA::PassKinergyCut(const int &A, const int &Z, const double &kinergy)
+{
+    if (mMassChargeToName.count({A, Z}) == 0)
+    {
+        return false;
+    }
+    return PassKinergyCut(mMassChargeToName[{A, Z}], kinergy / A);
+}
