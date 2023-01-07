@@ -26,6 +26,7 @@ namespace Physics
     double GetBeamRapidity(const std::string &beam, const int &beamEperA, const std::string &option = "new");
     double GetReactionBeta(const std::string &beam, const std::string &target, const int &beamEperA, const std::string &option = "new");
     double GetNucleiMass(const std::string &symbol, const std::string &option = "new");
+    double GetNucleiMass(const int &Z, const int &A, const std::string &option = "new");
 
 };
 

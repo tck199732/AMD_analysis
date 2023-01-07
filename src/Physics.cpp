@@ -86,6 +86,16 @@ double Physics::GetNucleiMass(const std::string &symbol, const std::string &opti
     return option == "new" ? Physics::particle_mass[symbol] : Physics::particle_mass_old[symbol] * Physics::amu_MeV;
 }
 
+double Physics::GetNucleiMass(const int &Z, const int &A, const std::string &option)
+{
+    std::string name = Physics::GetNucleiName(Z, A);
+    if (Physics::particle_mass.count(name) == 0)
+    {
+        return Physics::amu_MeV * A;
+    }
+    return option == "new" ? Physics::particle_mass[name] : Physics::particle_mass_old[name] * Physics::amu_MeV;
+}
+
 double Physics::GetReactionBeta(const std::string &reaction, const std::string &option)
 {
     std::string input = reaction;
