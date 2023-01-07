@@ -58,9 +58,6 @@ class Cuts:
     def select_hira_particle(br_name=['hira_Z', 'hira_N'], values=[1, 0]):
         return '&&'.join([f'{name} == {value}' for name, value in zip(br_name, values)])
 
-    
-
-
 
 class RDataFrame_AMD:   
     """ This class only works on the experimentally-filtered data. In these data sets, there are branches for microball and hira10 detector. The main branches are `N`, `Z`, `px`, `py`, `pz`. Except for the impact parameter, all branches have prefix of the detector names. For instance,
@@ -97,14 +94,21 @@ class RDataFrame_AMD:
         self.rdf = ROOT.RDataFrame(tree, str(path))
         self.column_names.update(self.rdf.GetColumnNames())
 
-    def _define_mass_number(self, rdf, inplace=True):
-        rdf = (rdf
-               .Define('uball_A', 'uball_N + uball_Z')
-               .Define('hira_A', 'hira_N + hira_Z')
-               )
+    def _define_template(self, rdf, rules, inplace=True):
+        for br, rule in rules.items():
+            rdf = rdf.Define(br, rule)
+            self.column_names.add(br)
+
         if inplace:
             self.rdf = rdf
         return rdf
+
+    def _define_mass_number(self, rdf, inplace=True):
+        rules = {
+            'uball_A' : 'uball_N + uball_Z',
+            'hira_A' : 'hira_N + hira_Z',
+        }
+        return self._define_template(rdf, rules, inplace=inplace)
 
     def _define_mass(self, rdf, inplace=True):
         if not self._setup_cpp_ame_mass:
@@ -116,18 +120,16 @@ class RDataFrame_AMD:
         return rdf
 
     def _define_uball_mass(self, rdf, br_name='uball_mass', inplace=True):
-        rdf = rdf.Define(br_name, f'{self._cpp_ame_mass}(uball_Z, uball_N)')
-        self.column_names.add(br_name)
-        if inplace:
-            self.rdf = rdf
-        return rdf
+        rules = {
+            br_name : f'{self._cpp_ame_mass}(uball_Z, uball_N)'
+        }
+        return self._define_template(rdf, rules, inplace=inplace)
 
     def _define_hira_mass(self, rdf, br_name='hira_mass', inplace=True):
-        rdf = rdf.Define(br_name, f'{self._cpp_ame_mass}(hira_Z, hira_N)')
-        self.column_names.add(br_name)
-        if inplace:
-            self.rdf = rdf
-        return rdf
+        rules = {
+            br_name : f'{self._cpp_ame_mass}(hira_Z, hira_N)'
+        }
+        return self._define_template(rdf, rules, inplace=inplace)
 
     def _define_mass_cpp(self, maxZ=4, maxN=4, fcn_name='DefineMass'):
         '''
@@ -171,93 +173,75 @@ class RDataFrame_AMD:
 
         return fcn_name
 
+
     def _define_momentum(self, rdf, inplace=True):
-        rdf = (rdf
-               .Define('uball_pmag', 'sqrt(pow(uball_px, 2.) + pow(uball_py, 2.) + pow(uball_pz, 2.))')
-               .Define('hira_pmag', 'sqrt(pow(hira_px, 2.) + pow(hira_py, 2.) + pow(hira_pz, 2.))')
-               .Define('uball_kinergy', 'sqrt(pow(uball_pmag, 2.) + pow(uball_mass, 2.)) - uball_mass')
-               .Define('hira_kinergy', 'sqrt(pow(hira_pmag, 2.) + pow(hira_mass, 2.)) - hira_mass')
-               )
-        self.column_names.update({'uball_pmag', 'hira_pmag'})
-        if inplace:
-            self.rdf = rdf
-        return rdf
+        rules = {
+            # uball
+            'uball_pmag_trans' : 'sqrt(pow(uball_px, 2.) + pow(uball_py, 2.))',
+            'uball_pmag': 'sqrt(pow(uball_pmag_trans, 2.) + pow(uball_pz, 2.))',
+            'uball_kinergy':'sqrt(pow(uball_pmag, 2.) + pow(uball_mass, 2.)) - uball_mass',
+            'uball_rapidity': '0.5 * log( (uball_kinergy + uball_pz + uball_mass) / (uball_kinergy - uball_pz + uball_mass) )',
+            # hira
+            'hira_pmag_trans' : 'sqrt(pow(hira_px, 2.) + pow(hira_py, 2.))',
+            'hira_pmag' : 'sqrt(pow(hira_pmag_trans, 2.) + pow(hira_pz, 2.))',
+            'hira_kinergy' : 'sqrt(pow(hira_pmag, 2.) + pow(hira_mass, 2.)) - hira_mass',
+            'hira_rapidity': '0.5 * log( (hira_kinergy + hira_pz + hira_mass) / (hira_kinergy - hira_pz + hira_mass) )',
+        }
+        return self._define_template(rdf, rules, inplace=inplace)
 
     def _define_angles(self, rdf, inplace=True):
-        rdf = (rdf
-               .Define('Hira_theta_rdn', 'Hira_theta * TMath::DegToRad()')
-               .Define('Hira_phi_rdn', 'Hira_phi * TMath::DegToRad()')
-               )
-        self.column_names.update({'Hira_theta_rdn', 'Hira_phi_rdn'})
-        if inplace:
-            self.rdf = rdf
-        return rdf
 
-    """
-    def _define_kinergy(self, rdf, inplace=True):
-        if not 'Hira_mass' in self.column_names:
-            rdf = self._define_mass(rdf, inplace)
+        rules =  {
+            'uball_theta', 'atan2(uball_pmag_trans, uball_pz) * TMath::RadToDeg()',
+            'uball_phi', '',
+            'hira_theta', 'atan2(hira_pmag_trans, hira_pz) * TMath::RadToDeg()',
+            'hira_phi', '',
+        }
+        return self._define_template(rdf, rules, inplace=inplace)
 
-        rdf = (rdf
-               .Define('Hira_kinergy', 'sqrt(pow(Hira_momentum, 2.) + pow(Hira_mass, 2.)) - Hira_mass')
-               .Define('Hira_kinergy_perA', 'Hira_kinergy / Hira_A')
-               )
+    def define_lab_frame_quantities(self, rdf, beta, inplace=True):
+        gamma = 1. / np.sqrt(1 - beta**2.)
+        rules = {
+            # uball
+            'uball_pz_lab' : f'{gamma} * (uball_pz + {beta} * (uball_kinergy + uball_mass))',
+            'uball_pmag' : 'sqrt(pow(uball_pz_lab,2.) + pow(uball_pmag_trans, 2.))',
+            'uball_kinergy_lab' : 'sqrt(pow(uball_pmag_lab, 2.) + pow(uball_mass, 2.)) - uball_mass',
+            'uball_rapidity_lab' : '0.5 * log( (uball_kinergy_lab + uball_pz_lab + uball_mass) / (uball_kinergy_lab - uball_pz_lab + uball_mass) )',
+            # hira
+            'hira_pz_lab' : f'{gamma} * (hira_pz + {beta} * (hira_kinergy + hira_mass))',
+            'hira_pmag' : 'sqrt(pow(hira_pz_lab,2.) + pow(hira_pmag_trans, 2.))',
+            'hira_kinergy_lab' : 'sqrt(pow(hira_pmag_lab, 2.) + pow(hira_mass, 2.)) - hira_mass',
+            'hira_rapidity_lab' : '0.5 * log( (hira_kinergy_lab + hira_pz_lab + hira_mass) / (hira_kinergy_lab - hira_pz_lab + hira_mass) )',
+        }
+        return self._define_template(rdf, rules, inplace=inplace)
+    
+    def _define_normalized_rapidity_lab(self, rdf, beam_rapidity, inplace=True):
+        rules = {
+            'hira_rapidity_lab_normed' : f'hira_rapidity_lab / {beam_rapidity}',
+        }
+        return self._define_template(rdf, rules, inplace=inplace)
+    
+    # def _define_cuts(
+    #         self,
+    #         rdf,
+    #         badmap_version='V1',
+    #         Nc=5,
+    #         multi=1,
+    #         angular_coverage=(30., 75.),
+    #         inplace=True):
 
-        if inplace:
-            self.rdf = rdf
-
-        self.column_names.update({'Hira_kinergy', 'Hira_kinergy_perA'})
-        return rdf
-
-    def _define_cms(self, rdf, inplace=True):
-        gamma = 1. / np.sqrt(1 - self.betacms**2.)
-
-        rdf = (rdf
-               .Define('Hira_pzcms', f'{gamma} * (Hira_pz - {self.betacms} * (Hira_kinergy + Hira_mass))')
-               .Define('Hira_momentum_cms', 'sqrt(pow(Hira_pzcms,2.) + pow(Hira_pt, 2.))')
-               .Define('Hira_kinergy_cms', 'sqrt(pow(Hira_momentum_cms, 2.) + pow(Hira_mass, 2.)) - Hira_mass')
-               )
-        if inplace:
-            self.rdf = rdf
-        self.column_names.update(
-            {'Hira_pzcms', 'Hira_momentum_cms', 'Hira_kinergy_cms'})
-        return rdf
-
-    def _define_rapidity(self, rdf, inplace=True):
-
-        rdf = (rdf
-               .Define('Hira_rapidity', '0.5 * log( (Hira_kinergy + Hira_pz + Hira_mass) / (Hira_kinergy - Hira_pz + Hira_mass) )')
-               .Define('Hira_rapidity_cms', '0.5 * log( (Hira_kinergy_cms + Hira_pzcms + Hira_mass) / (Hira_kinergy_cms - Hira_pzcms + Hira_mass) )')
-               .Define('Hira_rapidity_normalized', f'Hira_rapidity / {self.beam_rapdity}')
-               )
-        if inplace:
-            self.rdf = rdf
-        self.column_names.update(
-            {'Hira_rapidity', 'Hira_rapidity_cms', 'Hira_rapidity_normalized'})
-        return rdf
-
-    def _define_cuts(
-            self,
-            rdf,
-            badmap_version='V1',
-            Nc=5,
-            multi=1,
-            angular_coverage=(30., 75.),
-            inplace=True):
-
-        cuts = [
-            HiraCuts.cut_4pi_multiplicity(Nc),
-            HiraCuts.cut_multiplicity(multi),
-            HiraCuts.cut_kinergy(),
-            HiraCuts.cut_coverage(angular_coverage),
-            HiraCuts.cut_badmap(badmap_version)
-        ]
-        cuts = ' && '.join(cuts)
-        rdf = rdf.Define('Hira_cut', cuts)
-        if inplace:
-            self.rdf = rdf
-        return rdf
-    """
+    #     cuts = [
+    #         HiraCuts.cut_4pi_multiplicity(Nc),
+    #         HiraCuts.cut_multiplicity(multi),
+    #         HiraCuts.cut_kinergy(),
+    #         HiraCuts.cut_coverage(angular_coverage),
+    #         HiraCuts.cut_badmap(badmap_version)
+    #     ]
+    #     cuts = ' && '.join(cuts)
+    #     rdf = rdf.Define('Hira_cut', cuts)
+    #     if inplace:
+    #         self.rdf = rdf
+    #     return rdf
 
 
 # Some simple analysis class are listed below to demonstrate the usage.
