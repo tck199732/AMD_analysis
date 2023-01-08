@@ -153,7 +153,6 @@ void CompileTable21t(TTree *&tree, const std::string &path_table21, const std::s
         }
 
         int current_evt = ievt;
-        int multi = 0;
         while (!file_coll_hist.eof())
         {
             int collid;
@@ -176,13 +175,14 @@ void CompileTable21t(TTree *&tree, const std::string &path_table21, const std::s
             else
             {
                 double px, py, pz, bimp, buffer;
+                // for each particle in the current event
                 for (unsigned int j = 1; j <= gidmap.size(); j++)
                 {
                     std::vector<double> spacetime(4, 0.);
                     spacetime[0] = -1.;
+                    // for each nucleon in a primary particle
                     for (const auto &id : gidmap[j])
                     {
-                        // for each multi in a prim. particle
                         std::vector<double> last_interaction(7, 0.);
                         for (const auto &hist : coll_hist[id])
                         {
@@ -206,19 +206,19 @@ void CompileTable21t(TTree *&tree, const std::string &path_table21, const std::s
                     spacetime[2] /= gidmap[j].size();
                     spacetime[3] /= gidmap[j].size();
 
-                    amd.t[multi] = spacetime[0];
-                    amd.x[multi] = spacetime[1];
-                    amd.y[multi] = spacetime[2];
-                    amd.z[multi] = spacetime[3];
+                    amd.t[j] = spacetime[0];
+                    amd.x[j] = spacetime[1];
+                    amd.y[j] = spacetime[2];
+                    amd.z[j] = spacetime[3];
 
-                    file_table21 >> amd.Z[multi] >> amd.N[multi] >> amd.px[multi] >> amd.py[multi] >> amd.pz[multi];
+                    file_table21 >> amd.Z[j] >> amd.N[j] >> amd.px[j] >> amd.py[j] >> amd.pz[j];
                     for (auto _ = 0; _ < 5; _++)
                     {
                         file_table21 >> buffer;
                     }
                     file_table21 >> amd.b >> ievt;
                 }
-
+                amd.multi = gidmap.size();
                 tree->Fill();
                 gidmap.clear();
                 coll_hist.clear();
@@ -226,7 +226,6 @@ void CompileTable21t(TTree *&tree, const std::string &path_table21, const std::s
                 break;
             }
         }
-        multi = 0;
         event_processed++;
     }
 }
@@ -255,6 +254,7 @@ void CompileTable3(TTree *&tree, const std::string &path, const int &amass)
 
         if (nucleons_count == amass)
         {
+            amd.multi = multi;
             tree->Fill();
             nucleons_count = 0;
             multi = 0;
