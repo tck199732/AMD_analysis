@@ -1,7 +1,6 @@
 import pathlib
 import re
 import numpy as np
-import itertools
 from astropy import units
 from collections import defaultdict
 
@@ -9,25 +8,30 @@ from pyamd import PROJECT_DIR
 from pyamd.utilities import ame
 ame_table = ame.AME()
 
-class particle:
-    NZ = {
-        'n': (1, 0),
-        'p': (0, 1),
-        'd': (1, 1),
-        't': (2, 1),
-        '3He': (1, 2),
-        '4He': (2, 2),
+class Particle:
+    ALIAS = {
+        'n': 'n1',
+        'p': 'H1',
+        'd': 'H2',
+        't': 'H3',
+        '3He': 'He3',
+        '4He': 'He4',
+        'neutron' : 'n1',
+        'proton': 'H1',
+        'deuteron': 'H2',
+        'triton': 'H3',
+        'Helium3': 'He3',
+        'Helium4': 'He4',
+        'alpha' : 'He4',
+        'Alpha' : 'He4',
     }
-
     def __init__(self, name):
-        if name in self.NZ:
-            self.N, self.Z = self.NZ[name]
-            name = ame_table.get_symbol(*self.NZ[name])
-
+        if name in self.ALIAS:
+            name = self.ALIAS[name]
         self.name = name
-        self.mass = ame_table.get_mass(self.name)
-        self.N, self.Z = ame_table.get_NZ(symbol=self.name)
-
+        self.mass = ame_table.get_mass(name)
+        self.N, self.Z = ame_table.get_NZ(smbol=self.name)
+    
 class RunLog:
     CONFIG = pathlib.Path(PROJECT_DIR, 'database/e15190/RunInfo.data')
     def __init__(self, path_config=None):
@@ -70,82 +74,42 @@ class RunLog:
                     self.ShadowBar[reaction][id] = shadowbar
 
 
-class Reaction:
-    '''
-        mass_1u = 931.49410242
-        beam_mass = {
-            'Ca40': 39.962590866,
-            'Ca48': 47.95252290
-        }
-        target_mass = {
-            'Ni58': 57.935343,
-            'Ni64': 63.9279660,
-            'Sn112': 111.904818,
-            'Sn124': 123.9052739
-        }
-    '''
-    BEAM = ['Ca40', 'Ca48']
-    TARGET = ['Ni58', 'Ni64', 'Sn112', 'Sn124']
-    ENERGY = [56, 140]
-
-    def __init__(self):
-        self.reactions = [f'{b}{t}E{e}'.lower() for b, t, e in itertools.product(self.BEAM, self.TARGET, self.ENERGY)]
-        self._initialize_reaction = False
-
-    def set_reaction(self, reaction):
-        if not reaction.lower() in self.reactions:
-            raise ValueError('Invalid input name for reaction.')
-        
-        self._initialize_reaction = True
-
-        self.beamA, self.targetA, beam_energy = [
+class CollisionReaction:
+    @staticmethod
+    def dissemble_reaction(reaction):
+        beamA, targetA, beam_energy = [
             int(m) for m in re.compile('[0-9]+').findall(reaction)]
-        self.beam, self.target = [
+        beam, target = [
             m for m in re.compile('[A-Za-z]{2}').findall(reaction)]
-
-        self.beam_energy = beam_energy * units.MeV
-        beam = f'{self.beam}{self.beamA}'
-        target = f'{self.target}{self.targetA}'
-
-        self.beam_mass = ame_table.get_mass(beam)
-        self.target_mass = ame_table.get_mass(target)
         
+        return {
+            'beam' : beam,
+            'target' : target,
+            'beamA' : beamA,
+            'targetA' : targetA,
+            'beam_energy' : beam_energy
+        }
 
-    def get_name(self, latex=False):
-        if not self._initialize_reaction:
-            raise ValueError('Choose the reaction before parsing its symbol.')
+    @staticmethod
+    def get_betacms(reaction):
+        d = CollisionReaction.dissemble_reaction(reaction)
+        beam_mass = ame_table.get_mass(d['beam'] + str(d['beamA'])) 
+        target_mass = ame_table.get_mass(d['target'] + str(d['targetA'])) 
+        beam_ke = d['beam_energy'] * d['beamA'] * units.MeV
 
-        if latex:
-            name = r'$^{{beamA}}{beam} + ^{{targetA}}{target} @ {beamE}$ MeV/A'.format(
-                beamA=self.beamA,
-                beam=self.beam,
-                targetA=self.targetA,
-                target=self.target,
-                beamE=self.beam_energy.value
-            )
-        else:
-            name = f'{self.beam}{self.beamA}{self.target}{self.targetA}E{self.beam_energy.value}'
-        return name
+        beam_energy_tot = beam_ke + beam_mass
+        mom_beam = np.sqrt(beam_ke ** 2 + 2 * beam_ke * beam_mass)
+        gamma = beam_energy_tot / beam_mass
+        return mom_beam / (gamma * beam_mass + target_mass)
 
-    def get_betacms(self):
+    @staticmethod
+    def get_rapidity_beam(reaction):
+        d = CollisionReaction.dissemble_reaction(reaction)
+        beam_mass = ame_table.get_mass(d['beam'] + str(d['beamA'])) 
+        beam_ke = d['beam_energy'] * d['beamA'] * units.MeV
 
-        if not self._initialize_reaction:
-            raise ValueError('Choose the reaction before calculating the betacms.')
-
-        beam_ke = self.beam_energy * self.beamA
-        beam_energy_tot = beam_ke + self.beam_mass
-        mom_beam = np.sqrt(beam_ke**2 + 2*beam_ke * self.beam_mass)
-
-        gamma = beam_energy_tot/self.beam_mass
-        return mom_beam/(gamma*self.beam_mass + self.target_mass)
-
-    def get_rapidity_beam(self):
-        if not self._initialize_reaction:
-            raise ValueError('Choose the reaction before calculating the beam rapidity.')
-
-        beam_ke = self.beam_energy * self.beamA
-        mom_beam = np.sqrt(beam_ke**2 + 2*beam_ke * self.beam_mass)
-        return 0.5 * np.log((beam_ke + self.beam_mass + mom_beam) / (beam_ke + self.beam_mass - mom_beam))
+        mom_beam = np.sqrt(beam_ke ** 2 + 2 * beam_ke * beam_mass)
+        return 0.5 * np.log((beam_ke + beam_mass + mom_beam) / (beam_ke + beam_mass - mom_beam))
 
 
         
