@@ -30,7 +30,7 @@ class Particle:
             name = self.ALIAS[name]
         self.name = name
         self.mass = ame_table.get_mass(name)
-        self.N, self.Z = ame_table.get_NZ(smbol=self.name)
+        self.N, self.Z = ame_table.get_NZ(symbol=self.name)
     
 class RunLog:
     CONFIG = pathlib.Path(PROJECT_DIR, 'database/e15190/RunInfo.data')
