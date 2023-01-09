@@ -114,7 +114,7 @@ class Expr:
 
 
 class RDataFrame_AMD:
-    """ This class works on both experimental-filtered data and default data. In filtered-data, branches are named according to the detector microball and hira10 (might add VetoWall and NeutronWall in the future). The main branches are `N`, `Z`, `px`, `py`, `pz`. Except for the impact parameter, all branches have prefix of the detector names. For instance,
+    """ This class works on both experimental-filtered data and default data. The only difference is in the momenta data which is stored in the unit of `MeV per nucleon` in the original root file and `MeV` in the filtered file. In filtered-data, branches are named according to the detector microball and hira10 (might add VetoWall and NeutronWall in the future). The main branches are `N`, `Z`, `px`, `py`, `pz`. Except for the impact parameter, all branches have prefix of the detector names. For instance,
     Branches (filtered data)
     ------------------------
     `b`, `uball_multi`, `hira_px`, ..., etc
@@ -143,7 +143,11 @@ class RDataFrame_AMD:
         self.reaction = reaction
         self.column_names = set()
 
-        self.rdf = ROOT.RDataFrame(tree, str(path))
+        if isinstance(path, str) or isinstance(path, pathlib.Path):
+            self.rdf = ROOT.RDataFrame(tree, str(path))
+        elif isinstance(path, list):
+            self.rdf = ROOT.RDataFrame(tree, list(map(str, path)))
+
         self.column_names.update(self.rdf.GetColumnNames())
 
     def _define_template(self, rules, forced=False, inplace=True):
@@ -153,7 +157,8 @@ class RDataFrame_AMD:
                 self.column_names.add(br)
             elif forced:
                 rdf = self.rdf.Redefine(br, rule)
-
+            else:
+                return self.rdf
         if inplace:
             self.rdf = rdf
         return rdf
@@ -389,35 +394,35 @@ class Spacetime_Momentum(RDataFrame_AMD):
         super().__init__(path, tree, reaction)
 
     def _define_kinematics(self):
+        """ Before careful here, make sure the unit of `p` is correct (`MeV` or `MeV per nucleon`).
+        """
         # quantities which are the same lab and cms frame
-        self.define_mass_number(br_name='A', Z_name='Z', N_name='N')
-        self.define_mass(br_name='mass', N_name='N', Z_name='Z')
         self.define_transverse_momentum(
             br_name='ptrans', px_name='px', py_name='py')
 
         # cms frame quantities
         self.define_momentum(br_name='pmag', px_name='px',
                              py_name='py', pz_name='pz')
-        self.define_kinergy(br_name='kinergy',
-                            pmag_name='pmag', mass_name='mass')
         self.define_position(br_name='rmag', x_name='x',
                              y_name='y', z_name='z')
 
     def analyze_emission_time(self, hname='h2_time_momentum', bins=[600, 500], range=[[0., 600.], [0., 500.]]):
 
+        self._define_kinematics()
         results = dict()
         nevents = self.rdf.Count().GetValue()
 
         for par in self.PARTICLES:
             self.define_particle(br_name=par, Z_name='Z',
                                  N_name='N', inplace=True)
-            A = e15190.Particle(par).Z + e15190.Particle(par).N
             h2 = (self.rdf
                   .Define(f'pmag_{par}', f'pmag[{par}]')
-                  .Define(f'pmag_per_A_{par}', f'pmag_{par} / A')
-                  .Define('time', 't > 0.')
-                  .Define(f'time_{par}', f'time[{par}]')
-                  .Histo2D((f'{hname}_{par}', '', bins[0], *range[0], bins[1], *range[1]), f'pmag_per_A_{par}', f'time_{par}')
+                  .Define(f't_{par}', f't[{par}]')
+                  .Define('tcut', f't_{par} > 0.')
+                  # note : order of [tcut] is important here
+                  .Redefine(f'pmag_{par}', f'pmag_{par}[tcut]')
+                  .Redefine(f't_{par}', f't_{par}[tcut]')
+                  .Histo2D((f'{hname}_{par}', '', bins[0], *range[0], bins[1], *range[1]), f'pmag_{par}', f't_{par}')
                   ).GetValue()
 
             h2.Scale(1./nevents)
@@ -427,20 +432,24 @@ class Spacetime_Momentum(RDataFrame_AMD):
 
     def analyze_spacetime(self, hname='h2_position_momentum', bins=[400, 500], range=[[0., 40.], [0., 500.]]):
 
+        self._define_kinematics()
         results = dict()
         nevents = self.rdf.Count().GetValue()
-        self.define_position(br_name='rmag', x_name='x',
-                             y_name='y', z_name='z')
 
         for par in self.PARTICLES:
             self.define_particle(br_name=par, Z_name='Z',
                                  N_name='N', inplace=True)
-            A = e15190.Particle(par).Z + e15190.Particle(par).N
+
             h2 = (self.rdf
                   .Define(f'rmag_{par}', f'rmag[{par}]')
-                  .Define('time', 't > 0.')
-                  .Define(f'time_{par}', f'time[{par}]')
-                  .Histo2D((f'{hname}_{par}', '', bins[0], *range[0], bins[1], *range[1]), f'rmag_{par}', f'time_{par}')
+                  .Define(f't_{par}', f't[{par}]')
+
+                  .Define('tcut', f't_{par} > 0.')
+                  # note : order of [tcut] is important here
+                  .Redefine(f'rmag_{par}', f'rmag_{par}[tcut]')
+                  .Redefine(f't_{par}', f't_{par}[tcut]')
+
+                  .Histo2D((f'{hname}_{par}', '', bins[0], *range[0], bins[1], *range[1]), f'rmag_{par}', f't_{par}')
                   ).GetValue()
 
             h2.Scale(1./nevents)
