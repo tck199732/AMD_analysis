@@ -3,6 +3,7 @@ import re
 import numpy as np
 from astropy import units
 from collections import defaultdict
+from typing import Literal
 
 from pyamd import PROJECT_DIR
 from pyamd.utilities import ame
@@ -76,19 +77,24 @@ class RunLog:
 
 class CollisionReaction:
     @staticmethod
-    def dissemble_reaction(reaction):
+    def dissemble_reaction(reaction, dtype:Literal['dict', 'list']='dict'):
         beamA, targetA, beam_energy = [
             int(m) for m in re.compile('[0-9]+').findall(reaction)]
         beam, target = [
             m for m in re.compile('[A-Za-z]{2}').findall(reaction)]
         
-        return {
-            'beam' : beam,
-            'target' : target,
-            'beamA' : beamA,
-            'targetA' : targetA,
-            'beam_energy' : beam_energy
-        }
+        if dtype == 'dict':
+            return {
+                'beam' : beam,
+                'target' : target,
+                'beamA' : beamA,
+                'targetA' : targetA,
+                'beam_energy' : beam_energy,
+            } 
+        elif dtype == 'list':
+            return beam, target, beamA, targetA, beam_energy
+        else:
+            raise Exception('`dtype` must be `dict` or `list`.')
 
     @staticmethod
     def get_betacms(reaction):
