@@ -93,8 +93,8 @@ class Expr:
         return f'0.5 * log( ({kinergy_name} + {pz_name} + {mass_name}) / ({kinergy_name} - {pz_name} + {mass_name}) )'
 
     @staticmethod
-    def theta_deg(pmag_trans_name, pz_name):
-        return f'atan2({pmag_trans_name}, {pz_name}) * TMath::RadToDeg()'
+    def theta_deg(ptrans_name, pz_name):
+        return f'atan2({ptrans_name}, {pz_name}) * TMath::RadToDeg()'
     
     @staticmethod
     def phi_deg(px_name, py_name):
@@ -110,55 +110,6 @@ class Expr:
         gamma = 1. / np.sqrt(1 - beta**2.)
         return f'{gamma} * ({pz_name} - {beta} * ({kinergy_name} + {mass_name}))'
 
-class Cuts:
-    """ The cuts here should apply to filtered data of any model. 
-    """
-    @staticmethod
-    def uball_multi(br_name='uball_multi', low=1):
-        return f'{br_name} >= {low}'
-
-    @staticmethod
-    def hira_multi(br_name='hira_multi', low=1):
-        return f'{br_name} >= {low}'
-
-    @staticmethod
-    def impact_parameter(br_name='b', low=0., high=10.):
-        return f'{br_name} >= {low} && {br_name} < {high}'
-
-    """
-    @staticmethod
-    def cut_kinergy():
-        ekin = {
-            'p': (20.0, 198.0),
-            'd': (15.0, 263. / 2),
-            't': (12.0, 312. / 3),
-            '3He': (20.0, 200.0),
-            '4He': (18.0, 200.0),
-        }
-        n = 'hira_N
-        z = 'Hira_Z'
-        e = 'Hira_kinergy_perA'
-
-        cuts = ' || '.join([
-            f'({a} == 1 && {z} == 1 && {e} >= {ekin["p"][0]} && {e} <= {ekin["p"][1]})',
-            f'({a} == 2 && {z} == 1 && {e} >= {ekin["d"][0]} && {e} <= {ekin["d"][1]})',
-            f'({a} == 3 && {z} == 1 && {e} >= {ekin["t"][0]} && {e} <= {ekin["t"][1]})',
-            f'({a} == 1 && {z} == 2 && {e} >= {ekin["3He"][0]} && {e} <= {ekin["3He"][1]})',
-            f'({a} == 2 && {z} == 2 && {e} >= {ekin["4He"][0]} && {e} <= {ekin["4He"][1]})',
-        ])
-
-        return f'({cuts})'
-    """
-
-    @staticmethod
-    def select_uball_particle(br_name=['uball_Z', 'uball_N'], values=[1, 0]):
-        return '&&'.join([f'{name} == {value}' for name, value in zip(br_name, values)])
-
-    @staticmethod
-    def select_hira_particle(br_name=['hira_Z', 'hira_N'], values=[1, 0]):
-        return '&&'.join([f'{name} == {value}' for name, value in zip(br_name, values)])
-
-
 class RDataFrame_AMD:
     """ This class only works on the experimentally-filtered data. In these data sets, there are branches for microball and hira10 detector. The main branches are `N`, `Z`, `px`, `py`, `pz`. Except for the impact parameter, all branches have prefix of the detector names. For instance,
     Branches
@@ -169,7 +120,7 @@ class RDataFrame_AMD:
     Note that the true impact parameter is not the same as the :math: `$\hat{b}$` stored in experiemental data which are determined from `uball_multiplicity`. 
     """
 
-    def __init__(self, path, tree='AMD', beamA=40, targetA=58, energy=140, beam='Ca', target='Ni', **kwargs):
+    def __init__(self, path, tree='AMD', reaction='Ca40Ni58E140'):
         """ Initialize the RDataFrame. Default reaction in `Ca40Ni58E140`.
         Parameters
         ----------
@@ -182,81 +133,76 @@ class RDataFrame_AMD:
         beam, target : str
             symbol of beam / target nuclei
         """
-        self.beamA, self.targetA, self.energy = beam, target, energy
-        self.beam, self.target = beam, target
-        self.reaction = f'{beam}{beamA}{target}{targetA}E{energy}'
-
-        self.simulation_detail = dict()
-        self.simulation_detail.update(kwargs)
-
+        
+        self.reaction = reaction
         self.column_names = set()
 
         self.rdf = ROOT.RDataFrame(tree, str(path))
         self.column_names.update(self.rdf.GetColumnNames())
 
-    def _define_template(self, rdf, rules, inplace=True):
+    def _define_template(self, rules, forced=False, inplace=True):
         for br, rule in rules.items():
             if not br in self.column_names:
-                rdf = rdf.Define(br, rule)
+                rdf = self.rdf.Define(br, rule)
                 self.column_names.add(br)
-            else:
-                rdf= rdf.Redefine(br, rule)
+            elif forced:
+                rdf= self.rdf.Redefine(br, rule)
 
         if inplace:
             self.rdf = rdf
         return rdf
 
-    def _filter_template(self, rdf, rules, inplace=True):
-        rdf = rdf.Filter('&&'.join(rules))
+    def _filter_template(self, *args, inplace=True):
+        rdf = self.rdf.Filter('&&'.join(args))
         if inplace:
             self.rdf = rdf
         return rdf
 
-    def define_mass_number(self, rdf, br_name='uball_A', Z_name='uball_Z', N_name='uball_N', inplace=True):
+    def define_mass_number(self, br_name='A', Z_name='Z', N_name='N', inplace=True):
         rules = {
             br_name : Expr.mass_number(Z_name, N_name)
         }
-        return self._define_template(rdf, rules, inplace=inplace)
+        return self._define_template(rules, inplace=inplace)
 
-    def define_mass(self, rdf, fcn_name='DefineMass', br_name='uball_mass', N_name='uball_N', Z_name='uball_Z', inplace=True):
+    def define_mass(self, fcn_name='DefineMass', br_name='mass', N_name='N', Z_name='Z', inplace=True):
         
-        declare_mass_function(fcn_name)
+        declare_mass_function(fcn_name=fcn_name)
         rules = {
             br_name : Expr.mass(fcn_name, Z_name, N_name)
         }
-        return self._define_template(rdf, rules, inplace=inplace)
+        return self._define_template(rules, inplace=inplace)
     
-    def define_transverse_momentum(self, rdf, br_name='uball_pmag_trans', px_name='uball_px', py_name='uball_py', inplace=True):
+    def define_transverse_momentum(self, br_name='ptrans', px_name='px', py_name='py', inplace=True):
         rules = {
             br_name : Expr.transverse_momentum(px_name, py_name)
         }
-        return self._define_template(rdf, rules, inplace=inplace)
+        return self._define_template(rules, inplace=inplace)
 
-    def define_momentum(self, rdf, br_name='uball_pmag', px_name='uball_px', py_name='uball_py', pz_name='uball_pz', inplace=True):
+    def define_momentum(self, br_name='pmag', px_name='px', py_name='py', pz_name='pz', inplace=True):
         rules = {
             br_name : Expr.momentum(px_name, py_name, pz_name)
         }
-        return self._define_template(rdf, rules, inplace=inplace)
+        return self._define_template(rules, inplace=inplace)
 
-    def define_kinergy(self, rdf, br_name='uball_kinergy', pmag_name='uball_pmag', mass_name='mass_name', inplace=True):
+    def define_kinergy(self, br_name='kinergy', pmag_name='pmag', mass_name='mass', inplace=True):
         rules = {
             br_name : Expr.kinergy(pmag_name, mass_name)
         }
-        return self._define_template(rdf, rules, inplace=inplace)
+        return self._define_template( rules, inplace=inplace)
 
-    def define_rapidity(self, rdf, br_name='uball_rapidity', kinergy_name='uball_kinergy', mass_name='uball_mass', pz_name='uball_pz', inplace=True):
+    def define_rapidity(self, br_name='rapidity', kinergy_name='kinergy', mass_name='mass', pz_name='pz', inplace=True):
         rules = {
             br_name : Expr.rapidity(kinergy_name, pz_name, mass_name)
         }
-        return self._define_template(rdf, rules, inplace=inplace)
+        return self._define_template(rules, inplace=inplace)
 
-    def define_theta_deg(self, rdf, br_name='uball_theta_deg', pmag_trans_name='uball_pmag_trans', pz_name='uball_pz', inplace=True):
+    def define_theta_deg(self, br_name='theta_deg', ptrans_name='ptrans', pz_name='pz', inplace=True):
         rules = {
-            br_name : Expr.theta_deg(pmag_trans_name, pz_name)
+            br_name : Expr.theta_deg(ptrans_name, pz_name)
         }
-        return self._define_template(rdf, rules, inplace=inplace)
+        return self._define_template(rules, inplace=inplace)
 
-    def define_phi_deg(self, rdf, br_name='uball_phi_deg', px_name='uball_px', py_name='uball_py', inplace=True):
+    def define_phi_deg(self, br_name='phi_deg', px_name='px', py_name='py', forced=True, inplace=True):
         rules = {
             br_name : Expr.phi_deg(px_name, py_name)
         }
@@ -264,33 +210,46 @@ class RDataFrame_AMD:
             br_name : f'{br_name} > 0. ? {br_name} : {br_name} + 360.',
         }
         rules.update(update_rules)
-        return self._define_template(rdf, rules, inplace=inplace)
+        return self._define_template(rules, forced=forced, inplace=inplace)
 
-    def define_pz_lab(self, rdf, br_name='uball_pz_lab', pz_name='uball_pz', kinergy_name='kinergy_name', mass_name='uball_mass', beta=None, inplace=True):
+    def define_pz_lab(self, br_name='pz_lab', pz_name='pz', kinergy_name='kinergy', mass_name='mass', beta=None, inplace=True):
         if beta is None:
             beta = e15190.CollisionReaction.get_betacms(self.reaction)
         rules = {
             br_name : Expr.boost_to_lab(beta, pz_name, kinergy_name, mass_name)
         }
-        return self._define_template(rdf, rules, inplace=inplace)
+        return self._define_template(rules, inplace=inplace)
 
-    def define_normalized_rapidity_lab(self, rdf, br_name='uball_rapidity_lab_normed', rapidity_name='uball_rapidity_lab', beam_rapidity=None, inplace=True):
+    def define_normalized_rapidity_lab(self, br_name='rapidity_lab_normed', rapidity_name='rapidity_lab', beam_rapidity=None, inplace=True):
         if beam_rapidity is None:
             beam_rapidity = e15190.CollisionReaction.get_rapidity_beam(self.reaction)
         rules = {
             br_name : f'{rapidity_name} / {beam_rapidity}',
         }
-        return self._define_template(rdf, rules, inplace=inplace)
+        return self._define_template(rules, inplace=inplace)
 
-# Some simple analysis class are listed below to demonstrate the usage.
+    def define_particle(self, br_name, Z_name='Z', N_name='N', inplace=True):
+        par = e15190.Particle(br_name)
+        rules = {
+            br_name : f'{Z_name} == {par.Z} && {N_name} == {par.N}' 
+        }
+        return self._define_template(rules, inplace=inplace)
+
+"""
+From here on are some analysis classes utilizing the above RDataFrame. User should get the instance of the analysis in a seperate script and call the `analyze` method to get a `ROOT.TH2D` object or pandas.dataframe. 
+1. ImpactParameter_Multiplicity : 2D histogram `impact-parameter vs uball charged-multiplicity`
+2. TransverseMomentum_RapidityLab : 2D histogram `Pt vs rapidity / beam-rapidity (lab)`
+3. SpaceTime : 2D histogram `Emission Time vs Momentum`
+"""
+
 class ImpactParameter_Multiplicity(RDataFrame_AMD):
     """ A class for analyzing impact-parameter vs charged-particle multiplicity detected in microball. Since all the data we need would be `b` and `uball_multi`, we directly inherit the class RDataFrame_AMD and construct 2D histogram.
     """
 
-    def __init__(self, path, tree='AMD', beamA=40, targetA=58, energy=140, beam='Ca', target='Ni'):
-        super().__init__(path, tree, beamA, targetA, energy, beam, target)
+    def __init__(self, path, tree='AMD', reaction='Ca40Ni58E140'):
+        super().__init__(path, tree, reaction)
 
-    def analyze(self, hname='h2_multi_b', bins=[25, 100], range=[[-0.5, 24.5], [0., 10.]], br_names=['uball_multi', 'b'], return_type=Literal['ROOT.TH2D', 'pd.DataFrame']='pd.DataFrame'):
+    def analyze(self, hname='h2_multi_b', bins=[25, 100], range=[[-0.5, 24.5], [0., 10.]], br_names=['uball_multi', 'b'], return_type:Literal['ROOT.TH2D', 'pd.DataFrame']='ROOT.TH2D'):
         """ Construct 2D histogram Impact-parameter VS multiplicity
         Parameters
         ----------
@@ -318,67 +277,74 @@ class ImpactParameter_Multiplicity(RDataFrame_AMD):
             raise Exception('invalid return_type.')
 
 class TransverseMomentum_RapidityLab(RDataFrame_AMD):
-    """ Study transverse mometum :math: `P_{t}` vs :math: `\hat{y}_{lab}` rapidity / beam-rapidity. Apply cuts to select particle.
+    """ Study transverse mometum :math: `P_{t}` vs :math: `\hat{y}_{lab}` rapidity / beam-rapidity. Same calculations are done for the light clusters `p`, `d`, `t`, `3He` and `4He`. Note that in this analysis the filtered data table3 is read. This means 10 decay events are simulated out of 1 primary event and thus the error calculation is underestimated. For correct error calculation, one can approximate by the error bar obtained from only analyzing 1 decay event for each primary event (See **`${Project_Dir}/analysis/spectra.cpp`**) 
     """
 
-    def __init__(self, path, tree='AMD', beamA=40, targetA=58, energy=140, beam='Ca', target='Ni'):
-        super().__init__(path, tree, beamA, targetA, energy, beam, target)
-        self.results = dict()
+    def __init__(self, path, tree='AMD', reaction='Ca40Ni58E140'):
+        super().__init__(path, tree, reaction)
 
-    def _select_particles(self, br_name='proton', particle_mass_chage=(1, 1), inplace=False):
-        rules = {
-            br_name: Cuts.select_hira_particle(values=particle_mass_chage)
-        }
-        return self._define_template(self.rdf, rules, inplace=inplace)
+    def _define_kinematics(self):
+        # quantities which are the same lab and cms frame
+        self.define_mass_number(br_name='hira_A', Z_name='hira_Z', N_name='hira_N')
+        self.define_mass(br_name='hira_mass', N_name='hira_N', Z_name='hira_Z')
+        self.define_transverse_momentum(br_name='hira_ptrans', px_name='hira_px', py_name='hira_py')
 
-    def _define_event_cut(self, uball_multi=10, impact_parameter=(0., 10.), inplace=True):
-        uball_cut = Cuts.uball_multi(low=uball_multi)
-        bcut = Cuts.impact_parameter(
-            low=impact_parameter[0], high=impact_parameter[1])
-        return self._define_event_cut(self.rdf, [uball_cut, bcut], inplace=inplace)
+        # cms frame quantities
+        self.define_momentum(br_name='hira_pmag', px_name='hira_px', py_name='hira_py', pz_name='hira_pz')
+        self.define_kinergy(br_name='hira_kinergy', pmag_name='hira_pmag', mass_name='hira_mass')
 
-    def analyze(self, uball_multi=10, impact_parameter=(0., 10.), hname='h2_pta_rapidity_lab_normed', bins=[100, 800], range=[[0., 1.], [0., 800.]]):
+        # lab frame quantities
+        self.define_pz_lab(br_name='hira_pz_lab', pz_name='hira_pz', kinergy_name='hira_kinergy', mass_name='hira_mass')
+        self.define_momentum(br_name='hira_pmag_lab', px_name='hira_px', py_name='hira_py', pz_name='hira_pz_lab')
+        self.define_kinergy(br_name='hira_kinergy_lab', pmag_name='hira_pmag_lab', mass_name='hira_mass')
+        self.define_rapidity(br_name='hira_rapidity_lab', kinergy_name='hira_kinergy_lab', mass_name='hira_mass', pz_name='hira_pz_lab')
+        self.define_normalized_rapidity_lab(br_name='hira_rapidity_lab_normed', rapidity_name='hira_rapidity_lab')
 
-        self._define_event_cut(uball_multi, impact_parameter, inplace=True)
-        particles = {
-            'proton': (1, 1),
-            'deuteron': (2, 1),
-            'triton': (3, 1),
-            'He3': (3, 2),
-            'He4': (4, 2),
-        }
-        beam_rapidity = 1.
-        for name, mc in particles.items():
-            rdf = self._select_particles(name, *mc, inplace=False)
-            h2 = (rdf
-                  .Histo((f'{hname}_{name}', '', bins[0], *range[0], bins[1], *range[1]), f'hira_rapidity_lab[{name}] / {beam_rapidity}', f'hira_pmag_trans[{name}]')
-                  ).GetValue()
-            self.results[name] = h2
+    def _filter_event(self, multi=(10,25), bcut=(0., 10.), inplace=True):
+        uball_cut = f'uball_multi >= {multi[0]} && uball_multi <= {multi[1]}'
+        bcut = f'b >= {bcut[0]} && b < {bcut[1]}'
+        return self._filter_template(uball_cut, bcut, inplace=inplace)
 
-    def Output(self, fname=None):
-        if fname is None:
-            fname = f'{self.reaction}.root'
+    def analyze(self, multi=(10,25), bcut=(0., 10.), hname='h2_pta_rapidity_lab_normed', bins=[100, 800], range=[[0., 1.], [0., 800.]]):
+        """ Fill 2D Histograms of Pt/A vs rapidity / beam-rapidity in the lab frame. 
+        Paramters
+        ---------
+        multi : sequence of float of size 2
+            range of microball multiplicity
+        bcut : sequence of float of size 2
+            range of impact paramter. for simulation it is almost always kept unconstrained.
+        Return
+        ------
+        dict of ROOT.TH2D
+        """
+        self._filter_event(multi, bcut, inplace=True)
+        self._define_kinematics()
 
-        f = ROOT.TFile(fname, 'RECREATE')
-        f.cd()
-        for name, h2 in self.results.items():
-            h2.Write()
-        f.Write()
-        f.Close()
+        particles = [
+            'proton', 
+            'deuteron',
+            'triton',
+            'Helium3',
+            'Helium4',
+        ]
 
+        results = dict()
+        nevents = self.rdf.Count().GetValue()
 
-if __name__ == '__main__':
-    path = '/data/kin/amd/feb2022/b10fm/filtered/Ca40Ni58E140_SkM_table3.root'
-    tree = 'AMD'
-    # path = '/data/kin/imqmd-fanurs/filtered/Ca40Ni58E140_cluster.root'
-    # tree = 'cluster'
-    rdf = ImpactParameter_Multiplicity(
-        path=path, tree= tree)
-    df = rdf.analyze()
+        for par in particles:
+            self.define_particle(br_name=par, Z_name='hira_Z', N_name='hira_N', inplace=True)
+            A = e15190.Particle(par).Z + e15190.Particle(par).N
+            h2 = (self.rdf
+                .Define(f'hira_ptrans_{par}', f'hira_ptrans[{par}]')
+                .Define(f'hira_ptrans_per_A_{par}', f'hira_ptrans_{par} / {A}')
+                .Define(f'hira_rapidity_lab_normed_{par}', f'hira_rapidity_lab_normed[{par}]')
+                .Define(f'weight', '0.1')
+                .Histo2D((f'{hname}_{par}', '', bins[0], *range[0], bins[1], *range[1]), f'hira_rapidity_lab_normed_{par}', f'hira_ptrans_per_A_{par}', 'weight')
+                ).GetValue()
+            
+            h2.Scale(10./nevents)
+            results[par] = h2
 
-    from matplotlib.colors import LogNorm
-    fig, ax = plt.subplots()
-    ax.hist2d(df.x, df.y, weights=df['z'], bins=[25, 100], range=[[-0.5, 24.5], [0., 10.]], cmap='jet', norm=LogNorm())
-    fig.savefig('h2_multi_b.png')
+        return results
 
     
