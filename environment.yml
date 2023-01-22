@@ -6,50 +6,24 @@ dependencies:
    - python=3.9.12
    - conda-build
 
-   # common scientific tools
+   # analysis tools
    - numpy>=1.19.0
-  #  - numba>=0.51.0
    - astropy>=4.0
    - scipy>=1.6
    - sympy>=1.8
-
-   # data structure and files I/O
-  #  - pytables>=3.6.1
-  #  - tabulate>=0.8.9
    - pandas>=1.1.0
-  #  - lxml>=4.6.3
-  #  - pymysql>=1.0.1
-  #  - conda-forge::python-duckdb>=0.2.8
+   - iminuit=2.17.0
+   - scikit-learn>=0.24.0
+
+   # ROOT CERN
    - uproot>=4.0.7
    - root=6.26.06
-   - mako>=1.1.4
-   - iminuit=2.17.0
-   # statistical tools and machine learning
-   - fast-histogram=0.9
-  #  - numdifftools=0.9.39
-   - scikit-learn>=0.24.0
-  #  - ruptures>=1.1.4
-   - lmfit>=1.0.0
-   - fortranformat=1.2.2
-  #  - emcee>=3.0.0
 
    # plotting
    - matplotlib>=3.3.0
-  #  - seaborn>=0.11.0
-  #  - alphashape=1.3.1
-  #  - plotly::plotly>=5.0.0
 
    # miscellaneous
-  #  - cryptography=3.4.7
+   - mako>=1.1.4
    - autopep8
-  #  - pytest>=6.2.4
-  #  - coverage=6.3.2
-  #  - snakeviz=2.0.1
-  #  - sphinx=4.2.0
-  #  - django>=2.2.5
-
-   # C++ libraries
-  #  - nlohmann_json=3.9.1
-
-   # jupyter notebook
+   - fortranformat=1.2.2
    - ipykernel>=6.16.0
