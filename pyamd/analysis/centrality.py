@@ -1,15 +1,22 @@
+# plotting
+from pyamd.utilities import root6, dataframe, minuit
+from pyamd import PROJECT_DIR
+from copy import copy
+import warnings
 import pathlib
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit
 from astropy import units
-import warnings
-from copy import copy
+import matplotlib.pyplot as plt
 
-from pyamd import PROJECT_DIR
-from pyamd.utilities import root6, dataframe, minuit
+# analysis
+import pandas as pd
+import numpy as np
+from iminuit import Minuit
+from iminuit.cost import LeastSquares
 
+# I/O
+
+# local
 hist_reader = root6.HistogramReader()
 df_helper = dataframe.DataFrameHelper()
 
@@ -188,10 +195,11 @@ class Multiplicity_ImpactParameter:
         df = self.DifferentialCrossSection(
             range, cut, bins, unit)  # full range
         db = np.diff(df.x[0:2])
-        return np.sum(df['y']) * db
+        return np.sum(df['y']) * db, np.sqrt(np.sum(df['y_err'])) * db
 
     def BmaxFromCrossSection(self, range=(0., 10.), cut=(-0.5, 24.5), bins=20, unit=None):
-        return np.sqrt(self.CrossSection(range, cut, bins, unit) / np.pi)
+        sig, err = self.CrossSection(range, cut, bins, unit)
+        return np.sqrt(sig / np.pi), err / 2. / np.sqrt(np.pi * sig)
 
     def Mapping(self, ranges=[[-0.5, 24.5], [0., 10.]], bins=[25, 20], unit=None):
         """ Calculate the mapping from charged-particle multiplicty to Impact-Parameter
@@ -206,13 +214,20 @@ class Multiplicity_ImpactParameter:
             `None` : fm
         """
         df = self.MultiplicitySpectra(
-            range=ranges[0], cut=ranges[1], bins=bins[0]).query('y > 0.0')
+            range=ranges[0], cut=ranges[1], bins=bins[0])
+
+        # in case the spectra isn't normalized
         df['y'] /= np.sum(df['y'])
         df['y_err'] /= np.sum(df['y'])
-        bmax = self.BmaxFromCrossSection(
+
+        bmax, bmax_err = self.BmaxFromCrossSection(
             range=ranges[1], cut=ranges[0], bins=bins[1], unit=unit)
-        y = bmax * np.sqrt(np.abs(1. - np.cumsum(df['y'])))
-        yerr = 0.5 * bmax**2 / y * np.sqrt(np.cumsum(df['y_err']**2))
+
+        y = bmax * np.sqrt(1. - np.cumsum(df['y']))
+        yerr = np.sqrt(
+            (0.5 * bmax**2 / y * np.sqrt(np.cumsum(df['y_err']**2))) ** 2. +
+            (bmax_err * y / bmax) ** 2.
+        )
 
         df = pd.DataFrame({
             'x': df.x.to_numpy(),
@@ -225,13 +240,69 @@ class Multiplicity_ImpactParameter:
 
     @staticmethod
     def model_dsigma_db(x, norm, b0, db):
-        return norm * x / (1 + np.exp((x-b0)/db))
+        return norm * x / (1 + np.exp((x - b0) / db))
 
     @staticmethod
     def model_dsigma_db_error(x, norm, b0, db, norm_err, b0_err, db_err):
         return 0
 
-    def fit_dsigma_db(self, df=None, range=(0., 10.), bins=20, unit=None):
+    def fit_dsigma_db_iminuit(self, df=None, range=(0., 10.), bins=20, unit=None, verbose=1, output_info=False):
+        if df is None:
+            df = self.DifferentialCrossSection(
+                range=range, bins=bins, unit=None)
+
+        cost_fcn = LeastSquares(
+            df.x, df.y, df['y_err'], Multiplicity_ImpactParameter.model_dsigma_db)
+        m = Minuit(cost_fcn, norm=2.*np.pi, b0=9., db=0.1)
+        m.migrad()
+        m.hesse()
+
+
+        fit_info = {
+            'chi2' : m.fval,
+            'ndof' : df.x.shape[0] - m.nfit,
+        }
+        fit_info.update({
+            p : v,
+        } for p, v in zip(m.parameters, m.values))
+
+        fit_info.update({
+            f'{p}_err' : e,
+        } for p, e in zip(m.parameters, m.errors))
+        
+        if verbose != 0:
+            print('\n'.join(
+                [f'chi^2 / dof = {m.fval:.1f} / {len(df.x) - m.nfit}'] +
+                [f'{p} = {v:.3f} +/- {e:.3f}' for p, v,
+                e in zip(m.parameters, m.values, m.errors)]
+            ))
+
+        x = df.x.to_numpy()
+        y = Multiplicity_ImpactParameter.model_dsigma_db(
+            x, *m.values) * units.fm**2
+        yerr = Multiplicity_ImpactParameter.model_dsigma_db_error(
+            x, *m.values, *m.errors) * units.fm**2
+
+        if unit == 'mb':
+            y = y.to(1e-3 * units.barn)
+            yerr = yerr.to(1e-3 * units.barn)
+
+        elif unit == 'b':
+            y = y.to(units.barn)
+            yerr = yerr.to(units.barn)
+
+        df = pd.DataFrame({
+            'x': x,
+            'y': y.value,
+            'y_err': yerr.value
+        })
+        df_helper.calculate_relative_error(df)
+
+        if output_info:
+            return df, fit_info
+        return df
+
+    def fit_dsigma_db_TMinuit(self, df=None, range=(0., 10.), bins=20, unit=None):
         """ Fit the differential cross-section using TMinuit.
         Parameter
         ---------
@@ -259,6 +330,7 @@ class Multiplicity_ImpactParameter:
             f.value = chisq
 
         gMinuit = minuit.TMinuit(3, fcn)
+        gMinuit.set_verbose(0)
         gMinuit.set_parameter(0, 'norm', 2. * np.pi, 0.1)
         gMinuit.set_parameter(1, 'b0', 9., 0.1)
         gMinuit.set_parameter(2, 'db', 0.1, 0.01)
@@ -274,10 +346,10 @@ class Multiplicity_ImpactParameter:
 
         x = df.x.to_numpy()
         y = Multiplicity_ImpactParameter.model_dsigma_db(
-            df.x.to_numpy(), norm, b0, db
+            x, norm, b0, db
         ) * units.fm**2
         yerr = Multiplicity_ImpactParameter.model_dsigma_db_error(
-            df.x.to_numpy(), norm, b0, db, norm_err, b0_err, db_err
+            x, norm, b0, db, norm_err, b0_err, db_err
         ) * units.fm**2
 
         if unit == 'mb':
@@ -339,7 +411,7 @@ class Multiplicity_ImpactParameter:
         df = df.query('y > 0. & y_err > 0.')
 
         par, cov = curve_fit(
-            #lambda x, *par : model(x, *par),
+            # lambda x, *par : model(x, *par),
             model,
             df.x.to_numpy(),
             df.y.to_numpy(),
@@ -384,12 +456,3 @@ class Multiplicity_ImpactParameter:
         kw = dict(fmt='--')
         kw.update(kwargs)
         return self.plotfit(ax, df, range=range, bins=bins, **kw)
-
-    # def output(self, df, path, **kwargs):
-    #     kw = dict(
-    #         sep='\t',
-    #         columns=df.columns,
-    #         mode='w',
-    #     )
-    #     kw.update(kwargs)
-    #     df.to_csv(path, kw)
