@@ -12,8 +12,11 @@ dependencies:
    - scipy>=1.6
    - sympy>=1.8
    - pandas>=1.1.0
-   - iminuit=2.17.0
+   - iminuit=2.18.0
    - scikit-learn>=0.24.0
+
+   # performance 
+   - numba>=0.51.0
 
    # ROOT CERN
    - uproot>=4.0.7
