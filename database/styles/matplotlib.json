@@ -4,10 +4,11 @@
     "figure.dpi": 150,
     "figure.figsize": [
         4,
-        3
+        3.5
     ],
     "figure.facecolor": "white",
     "grid.linestyle": "dashed",
+    "axes.labelsize": 12,
     "xtick.top": true,
     "xtick.direction": "in",
     "xtick.minor.visible": true,
