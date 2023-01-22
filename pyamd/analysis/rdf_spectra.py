@@ -285,10 +285,18 @@ class ImpactParameter_Multiplicity(RDataFrame_AMD):
         ------
         pd.DataFrame or ROOT.TH2D
         """
+
+        # 1 primary event -> 10 secondary events
+        weight = 0.1
+
+        nevents = self.rdf.Filter(f'{br_names[0]} > 0').Count().GetValue() * weight
         h2 = (self.rdf
               .Filter(f'{br_names[0]} > 0')
-              .Histo2D((hname, '', bins[0], *range[0], bins[1], *range[1]), *br_names)
+              .Define('weight', f'{weight}')
+              .Histo2D((hname, '', bins[0], *range[0], bins[1], *range[1]), *br_names, 'weight')
               ).GetValue()
+
+        h2.Scale(1./nevents)
         if return_type == 'ROOT.TH2D':
             return h2
         elif return_type == 'pd.DataFrame':
