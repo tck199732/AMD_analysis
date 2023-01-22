@@ -1,13 +1,11 @@
-
-
-import pathlib
-import os
-import subprocess
+# system
 import sys
-import numpy as np
-from array import array
+import pathlib
+import subprocess
+
+# analysis
 import ctypes
-import iminuit
+from array import array
 
 try:
     import ROOT
@@ -21,6 +19,32 @@ except:
 
 
 class TMinuit:
+    """ A wrapper class of ROOT.TMinuit
+    Examples
+    --------
+    ```{code}
+    x = array('d', [1.,2.,3.,4.,5.])
+    y = array('d', [10.,20.,30.,41.,43.])
+    yerr = array('d', [1.,1.,1.,4.,8.])
+
+    def fcn( npar, gin, f, par, iflag):
+        chisq = 0.
+        for i in range(len(x)):
+            delta = (model(x[i], par) - y[i]) / yerr[i]
+            chisq += delta**2
+        f.value = chisq
+
+    def model( x, par ):
+        return par[0]*x + par[1]
+
+    if __name__ == '__main__':
+        gMinuit = TMinuit(2, fcn)
+        gMinuit.set_parameter(0, 'a1', 7, 0.1)
+        gMinuit.set_parameter(1, 'a2', 0.0, 0.1)
+        gMinuit.fit()
+    ```
+    """
+
     def __init__(self, n, fcn, maxcall=500, tol=0.1):
         self.minuit = ROOT.TMinuit(n)
         self.minuit.SetFCN(fcn)
@@ -104,49 +128,3 @@ class TMinuit:
 
     def get_parameter_name(self, n=0):
         return self.parameter_names[n]
-
-
-# class IMinuit:
-#     def __init__(self, n, fcn):
-#         self.minuit = iminuit.Minuit()
-#         self.fcn = fcn
-
-
-# testing
-'''
-x = array('d', [1.,2.,3.,4.,5.])
-y = array('d', [10.,20.,30.,41.,43.])
-yerr = array('d', [1.,1.,1.,4.,8.])
-
-def fcn( npar, gin, f, par, iflag):
-    chisq = 0.
-    for i in range(len(x)):
-        delta = (model(x[i], par) - y[i]) / yerr[i]
-        chisq += delta**2
-    f.value = chisq
-
-def model( x, par ):
-    return par[0]*x + par[1]
-
-if __name__ == '__main__':
-    gMinuit = TMinuit(2, fcn)
-    gMinuit.set_parameter(0, 'a1', 7, 0.1)
-    gMinuit.set_parameter(1, 'a2', 0.0, 0.1)
-    gMinuit.fit()
-
-'''
-
-
-m = ROOT.TMinuit(2)
-
-
-def model(x, par):
-    return par[0]*x + par[1]
-
-
-def fcn(npar, gin, f, par, iflag):
-    chisq = 0.
-    for i in range(len(x)):
-        delta = (model(x[i], par) - y[i]) / yerr[i]
-        chisq += delta**2
-    f.value = chisq
