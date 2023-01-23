@@ -1,22 +1,26 @@
 # plotting
-from pyamd.utilities import root6, dataframe, minuit
-from pyamd import PROJECT_DIR
-from copy import copy
-import warnings
-import pathlib
-from scipy.optimize import curve_fit
-from astropy import units
 import matplotlib.pyplot as plt
 
+# I/O
+import pathlib
+import warnings
+
 # analysis
-import pandas as pd
 import numpy as np
+import pandas as pd
+from astropy import units
 from iminuit import Minuit
 from iminuit.cost import LeastSquares
+from scipy.optimize import curve_fit
 
-# I/O
+# miscellaneous
+from copy import copy
+from functools import cache
 
 # local
+from pyamd import PROJECT_DIR
+from pyamd.utilities import dataframe, minuit, root6, symwrap
+
 hist_reader = root6.HistogramReader()
 df_helper = dataframe.DataFrameHelper()
 
@@ -239,12 +243,26 @@ class Multiplicity_ImpactParameter:
         return df
 
     @staticmethod
+    def create_model_dsigma_db():
+        expr = 'a * x / (1 + exp((x - b) / c))'
+        vars = ['x', 'a', 'b', 'c']
+        return symwrap.expression.make_function(vars, expr)
+
+    @staticmethod
+    def create_model_dsigma_db_error():
+        expr = 'a * x / (1 + exp((x - b) / c))'
+        vars = ['x', 'a', 'b', 'c']
+        return symwrap.expression.error_propagation(vars, pars=['x'], expr=expr)
+
+    @staticmethod
     def model_dsigma_db(x, norm, b0, db):
-        return norm * x / (1 + np.exp((x - b0) / db))
+        f = Multiplicity_ImpactParameter.create_model_dsigma_db()
+        return f(x, norm, b0, db)
 
     @staticmethod
     def model_dsigma_db_error(x, norm, b0, db, norm_err, b0_err, db_err):
-        return 0
+        ferr = Multiplicity_ImpactParameter.create_model_dsigma_db_error()
+        return ferr(x, norm, b0, db, norm_err, b0_err, db_err)
 
     def fit_dsigma_db_iminuit(self, df=None, range=(0., 10.), bins=20, unit=None, verbose=1, output_info=False):
         if df is None:
@@ -257,24 +275,23 @@ class Multiplicity_ImpactParameter:
         m.migrad()
         m.hesse()
 
-
         fit_info = {
-            'chi2' : m.fval,
-            'ndof' : df.x.shape[0] - m.nfit,
+            'chi2': m.fval,
+            'ndof': df.x.shape[0] - m.nfit,
         }
         fit_info.update({
-            p : v,
-        } for p, v in zip(m.parameters, m.values))
+            p : v for p, v in zip(m.parameters, m.values)
+        })
 
         fit_info.update({
-            f'{p}_err' : e,
-        } for p, e in zip(m.parameters, m.errors))
-        
+            f'{p}_err' : e for p, e in zip(m.parameters, m.errors)
+        })
+
         if verbose != 0:
             print('\n'.join(
                 [f'chi^2 / dof = {m.fval:.1f} / {len(df.x) - m.nfit}'] +
                 [f'{p} = {v:.3f} +/- {e:.3f}' for p, v,
-                e in zip(m.parameters, m.values, m.errors)]
+                 e in zip(m.parameters, m.values, m.errors)]
             ))
 
         x = df.x.to_numpy()
