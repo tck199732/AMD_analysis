@@ -1,51 +1,29 @@
-from pyamd import PROJECT_DIR
-from pyamd.e15190 import e15190
-from pyamd.utilities import root6, dataframe
-import pathlib
+# I/O
 import os
+import pathlib
+import warnings
+
+# analysis tool
 import pandas as pd
 import numpy as np
+
+# plotting
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
-from copy import copy
+
+# miscellaneous
 import random
+from copy import copy
+from typing import Literal
 from datetime import datetime
 random.seed(datetime.now().timestamp())
 
+# local
+from pyamd import PROJECT_DIR
+from pyamd.e15190 import e15190
+from pyamd.utilities import root6, dataframe
 df_helper = dataframe.DataFrameHelper()
 hist_reader = root6.HistogramReader()
-
-
-class SpectraFile:
-    def __init__(self, path):
-        self.path = pathlib.Path(path).resolve()
-
-    def get_names(self, particle='None'):
-        if not self.path.exists():
-            raise OSError(f'file not found : {str(self.path)}')
-
-        if self.path.is_file() and os.access(self.path, os.R_OK):
-            with root6.TFile(str(self.path)) as file:
-                if particle is None:
-                    return [key.GetName() for key in file.GetListOfKeys()]
-                else:
-                    return [key.GetName() for key in file.GetListOfKeys() if key.GetName().endswith('_' + particle)]
-
-    def get_histogram(self, name=None, particle=None, keyword=None, verbose=1):
-        if name is None:
-            names = self.get_names(particle)
-            names = [name for name in names if keyword.lower() in name.lower()]
-            if len(names) == 0:
-                raise ValueError('No objects is returned.')
-            name = min(names, key=len)
-            if verbose == 1:
-                print(f'reading : {name}')
-
-        with root6.TFile(self.path) as file:
-            hist = file.Get(name)
-            hist.SetDirectory(0)  # will not be deleted when file is closed
-            return hist
-
 
 class PtRapidityLAB:
     lab_theta_range = (30.0, 75.0)  # degree
@@ -64,37 +42,52 @@ class PtRapidityLAB:
         '10Be': (22.0, 200.0),
     }
 
-    DIR = f'{str(PROJECT_DIR)}/result/spectra'
+    DIR = pathlib.Path(PROJECT_DIR, '/result/spectra')
+    
+    def __init__(self, particle, path=None, reaction='Ca48Ni64E140', skyrme=None, mode:Literal['primary','secondary', 'secondary_one_decay']='secondary', impact_parameter=(0., 3.), uball_multiplicity=(1, 25), histname=None, verbose=1):
+        """ A class for handling TH2D tranverse momentum / A v.s. rapidity / beam-rapidity
+        Parameters
+        ----------
+        particle : str
+        path : str / pathlib.Path
+            path of the root file containing the h2
+        histname : str
+            fullname of the h2 in `path`
+        """
+        self.particle = e15190.Particle(particle)
+        self.reaction = reaction
+        self.skyrme = 'EXP' if skyrme is None else skyrme
+        self.impact_parameter = impact_parameter
+        self.uball_multiplicity = uball_multiplicity
+        self.mode = mode
 
-    def __init__(self, particle, df=None, path=None, reaction='Ca48Ni64E140', skyrme='SkM', impact_parameter=(0., 3.), uball_multiplicity=(1, 25), mode='seq', histname=None, verbose=0):
-        self.particle = e15190.particle(particle)
-        self.reaction = e15190.reaction(reaction)
-        self.betacms = self.reaction.get_betacms()
-        self.beam_rapidity = self.reaction.get_rapidity_beam()
+        if path is None:
+            if skyrme != 'EXP':
+                path = pathlib.Path(self.DIR, f'{reaction}_{skyrme}.root')
+            if not path.exists():
+                raise IOError(f'file not found : {str(path)}')
+            if not (self.path.is_file() and os.access(self.path, os.R_OK)):
+                raise IOError(f'check file permission {str(path)}')
 
-        if df is None:
-            if path is None:
-                path = f'{self.DIR}/{reaction}_{skyrme}_Ncmin{uball_multiplicity[0]}_Ncmax{uball_multiplicity[1]}_b{impact_parameter[1]:.0f}fm.root'
+        if histname is None:
+            if skyrme != 'EXP':
+                histname = f'h2_pt_rapidity_{mode}_{particle}'
+            else:
+                histname = f'h2_pt_rapidity_{particle}'
 
-            spectra_file = SpectraFile(path)
+        with root6.TFile(str(path)) as file:
+            try:
+                hist = file[histname]
+            except:
+                objname = file.keys()[0]
+                if verbose == 1:
+                    warnings.warn(
+                        f'hist name {histname} not found in root file. We will use the first object in the file, i.e. `{objname}`')
+                hist = file[objname]
 
-            if histname is None:
-                # histname in AMD result
-                histname = f'h2_pta_rapidity_lab_{mode}_{particle}'
+            self.df = hist_reader.hist2d_to_df(hist)
 
-            df = spectra_file.get_histogram(
-                particle=particle, keyword=histname, verbose=verbose)
-            df = hist_reader.hist2d_to_df(df, keep_zeros=False)
-
-        if not 'z_ferr' in df.columns:
-            df.columns = ['x', 'y', 'z', 'z_err']
-            df['z_ferr'] = np.divide(df['z_err'], df['z'], where=(
-                df['z'] != 0.0), out=np.zeros_like(df['z_err']))
-
-        df.columns = ['x', 'y', 'z', 'z_err', 'z_ferr']
-        self.df = df
-
-    def query(self, df=None, xrange=(0.4, 0.6), yrange=(0., 600.)):
+    def query(self, df=None, xrange=(0.4, 0.6), yrange=(0., 600.), inplace=False):
         if df is None:
             df = self.df.copy()
 
@@ -109,38 +102,48 @@ class PtRapidityLAB:
         # e.g. if bin width is 0.005, then 0.396 is included in ROOT Projection.
         # 0.395 is not included becasue any value exactly the same as the interval would be filled in the bin on the left. so (> and <=)
 
-        df.query(
-            f'x > {float(x1)} & x <= {float(x2)} & y > {float(y1)} & y <= {float(y2)}', inplace=True)
+        df.query(f'x > {x1} & x <= {x2} & y > {y1} & y <= {y2}', inplace=True)
+        if inplace:
+            self.df = df
         return df
 
-    def correct_coverage(self, df=None, xrange=(0.4, 0.6), yrange=(0., 600.)):
-        df = self.query(df, xrange, yrange)
-        df.query('z > 0.0', inplace=True)
-        df.reset_index(inplace=True, drop=True)
-        correction = np.ones(df.shape[0])
-        for val, subdf in df.groupby('y'):
-            if subdf.shape[0] == 1:
-                correction[np.array(subdf.index)] = 0.
-            else:
-                dx = np.diff(np.array(subdf.x)[0:2])
-                x1 = np.min(subdf.x) + dx * np.random.uniform(-0.5, 0.5)
-                x2 = np.max(subdf.x) + dx * np.random.uniform(-0.5, 0.5)
-                correction[np.array(subdf.index)] = abs(x2-x1)
-        df['correction'] = correction
+    # def correct_coverage(self, df=None, xrange=(0.4, 0.6), yrange=(0., 600.)):
+    #     df = self.query(df, xrange, yrange)
+    #     df.query('z > 0.0', inplace=True)
+    #     df.reset_index(inplace=True, drop=True)
+    #     correction = np.ones(df.shape[0])
+    #     for val, subdf in df.groupby('y'):
+    #         if subdf.shape[0] == 1:
+    #             correction[np.array(subdf.index)] = 0.
+    #         else:
+    #             dx = np.diff(np.array(subdf.x)[0:2])
+    #             x1 = np.min(subdf.x) + dx * np.random.uniform(-0.5, 0.5)
+    #             x2 = np.max(subdf.x) + dx * np.random.uniform(-0.5, 0.5)
+    #             correction[np.array(subdf.index)] = abs(x2-x1)
+    #     df['correction'] = correction
 
-        df.query('correction > 0.0', inplace=True)
-        df['correction'] = df['correction'] / np.diff(xrange)
-        df['z'] = df['z']/df['correction']
-        df['z_err'] = df['z_err']/df['correction']
-        df.drop('correction', axis=1, inplace=True)
-        return df
+    #     df.query('correction > 0.0', inplace=True)
+    #     df['correction'] = df['correction'] / np.diff(xrange)
+    #     df['z'] = df['z']/df['correction']
+    #     df['z_err'] = df['z_err']/df['correction']
+    #     df.drop('correction', axis=1, inplace=True)
+    #     return df
 
     def PtSpectrum(self, xrange=(0.4, 0.6), yrange=(0., 600.), bins=30,  correct_coverage=False, correct_range=(0., 600)):
+        """ calculate ProjectionX of the h2
+        Parameters
+        ----------
+        bins : int
+            number of bins in Pt spectra
+        correct_coverage : bool
+            will correct for coverage if True
+        """
         if correct_coverage:
             df = self.correct_coverage(xrange=xrange, yrange=correct_range)
         else:
-            df = self.query(xrange=xrange, yrange=yrange)
-        df.query('z > 0.0', inplace=True)
+            df = self.df.query(f'x > {xrange[0]} & x <= {xrange[1]} & y > {yrange[0]} & y <= {yrange[1]}')
+
+        df = df.query('z > 0.0')
 
         hist, edges = np.histogram(
             df.y, range=yrange, bins=bins, weights=df['z'])
@@ -157,6 +160,8 @@ class PtRapidityLAB:
             'y_ferr':  np.divide(histerr, hist, out=np.zeros_like(histerr), where=(hist != 0.0))
         })
 
+
+"""
     def RapidityCMS(self, range=(-0.5, 0.5), bins=100):
         df = self.df.copy()
         df.query('z > 0.0', inplace=True)
@@ -279,6 +284,7 @@ class PtRapidityLAB:
         return np.sum(df.y) * np.diff(xrange) * np.diff(yrange)/bins
 
 
+
 class EkinThetaCMS:
     def __init__(self, particle, df=None, reaction=None, path=None, skyrme='SkM', impact_parameter=(0., 3.), uball_multiplicity=(1, 25), mode='all'):
 
@@ -352,12 +358,4 @@ class EkinThetaCMS:
         df = self.query(xrange=range[0], yrange=range[1])
         return df_helper.plot2d(ax, df, range=range, bins=bins, **kwargs)
 
-
-if __name__ == '__main__':
-
-    spectra = PtRapidityLAB(particle='p', reaction='Ca48Ni64E140', skyrme='SkM', impact_parameter=(
-        0., 3.), uball_multiplicity=(11, 25), mode='seq')
-
-    fig, ax = plt.subplots()
-    spectra.plotPtRapidity(ax, norm=LogNorm())
-    fig.savefig('test.png')
+"""
