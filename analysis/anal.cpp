@@ -1,5 +1,3 @@
-
-
 #include "anal.hh"
 struct particle
 {
@@ -12,7 +10,6 @@ public:
     Histograms(const std::string &suffix);
     ~Histograms() { ; }
     void fill(const particle &particle, const double betacms, const double &beam_rapidity, const double &weight);
-    // void fill(const Event &event, const double betacms, const double &beam_rapidity, const double &weight);
     void normalize(const double &scale);
     void write();
 
@@ -25,30 +22,16 @@ protected:
 
 int main(int argc, char *argv[])
 {
-    // passe args
-    std::string reaction = argv[1];
-    std::string output_pth = argv[2];
+    ArgumentParser argparser(argc, argv);
 
-    int nfiles_input = std::stoi(argv[3]);
-    std::vector<std::string> input_pths21;
-    std::vector<std::string> input_pths3;
-    int narg = 4;
-    for (int _ = 0; _ < nfiles_input; _++)
-    {
-        input_pths21.push_back(argv[narg]);
-        narg++;
-    }
-    for (int _ = 0; _ < nfiles_input; _++)
-    {
-        input_pths3.push_back(argv[narg]);
-        narg++;
-    }
+    std::string reaction = argparser.reaction;
+    std::string output_file = argparser.output_file;
 
     // initialize Tchains and other structures
-    TChain *chain21 = new TChain("amd");
-    TChain *chain3 = new TChain("amd");
-    Initialize_TChain(chain21, input_pths21, "filtered", "21");
-    Initialize_TChain(chain3, input_pths3, "filtered", "3");
+    TChain *chain21 = new TChain("AMD");
+    TChain *chain3 = new TChain("AMD");
+    Initialize_TChain(chain21, argparser.input_files_table21, "raw", "21");
+    Initialize_TChain(chain3, argparser.input_files_table3, "filtered", "3");
 
     // initialize Histogramss in different mode
     Histograms *histo21 = new Histograms("primary");
@@ -58,8 +41,21 @@ int main(int argc, char *argv[])
     // define physics quantities
     double betacms = Physics::GetReactionBeta(reaction);
     double beam_rapidity = Physics::GetBeamRapidity(reaction);
+
     int nevents21 = chain21->GetEntries();
     int nevents3 = chain3->GetEntries();
+
+    if (argparser.verbose == 1)
+    {
+        std::cout << "--------------------------------------------------------------------" << std::endl;
+        std::cout << "reaction : " << reaction << std::endl;
+        std::cout << "betacms : " << betacms << std::endl;
+        std::cout << "beam rapidity : " << beam_rapidity << std::endl;
+        std::cout << "nevents21 : " << nevents21 << std::endl;
+        std::cout << "nevents3  : " << nevents3 << std::endl;
+        std::cout << "uball-multiplicity cut : >=" << argparser.cut_on_uball_charged_particles << std::endl;
+        std::cout << "--------------------------------------------------------------------" << std::endl;
+    }
 
     // counter of weights of each primary event
     std::vector<double> weights(nevents21, 0.);
@@ -73,7 +69,7 @@ int main(int argc, char *argv[])
     {
         chain3->GetEntry(ievt3);
 
-        if (amd.Nc >= 1)
+        if (amd.Nc >= argparser.cut_on_uball_charged_particles)
         {
             norm_table3 += 1. / NDECAYS;
             if (ievt3 < nevents3 / NDECAYS)
@@ -134,7 +130,7 @@ int main(int argc, char *argv[])
     }
 
     // saving results
-    TFile *outputfile = new TFile(output_pth.c_str(), "RECREATE");
+    TFile *outputfile = new TFile(output_file.c_str(), "RECREATE");
     outputfile->cd();
     histo21->normalize(norm_table21);
     histo3->normalize(norm_table3);
@@ -152,7 +148,7 @@ Histograms::Histograms(const std::string &suffix)
     for (const auto &pn : this->PARTICLENAMES)
     {
         std::string hname = Form("h2_pt_rapidity_%s_%s", suffix.c_str(), pn.c_str());
-        this->h2_pta_rapidity_lab[pn] = new TH2D(hname.c_str(), "", 100, 0., 1., 600, 0, 600);
+        this->h2_pta_rapidity_lab[pn] = new TH2D(hname.c_str(), "", 100, 0., 1., 800, 0, 800);
         this->h2_pta_rapidity_lab[pn]->Sumw2();
         this->h2_pta_rapidity_lab[pn]->SetDirectory(0);
     }
@@ -161,10 +157,12 @@ Histograms::Histograms(const std::string &suffix)
 void Histograms::fill(const particle &particle, const double betacms, const double &beam_rapidity, const double &weight)
 {
     std::string name = Physics::GetNucleiName(particle.Z, particle.Z + particle.N);
+    double A = particle.Z + particle.N;
 
+    double mass = Physics::GetNucleiMass(particle.Z, A);
+    // physics quantities (total, not per nucleon)
     double pt = Physics::GetPt(particle.px, particle.py);
     double p = Physics::GetP(pt, particle.pz);
-    double mass = Physics::GetNucleiMass(particle.Z, particle.Z + particle.N);
     double kinergy = Physics::GetEkin(mass, p);
     double rapidity_cms = Physics::GetRapidity(kinergy, particle.pz, mass);
 
@@ -175,18 +173,23 @@ void Histograms::fill(const particle &particle, const double betacms, const doub
 
     double rapidity_lab_normed = rapidity_lab / beam_rapidity;
 
+    // std::cout << "pt=" << pt << std::endl;
+    // std::cout << "p=" << p << std::endl;
+    // std::cout << "mass=" << mass << std::endl;
+
     if (this->h2_pta_rapidity_lab.count(name) == 1)
     {
-        this->h2_pta_rapidity_lab[name]->Fill(rapidity_lab_normed, pt, weight);
+        this->h2_pta_rapidity_lab[name]->Fill(rapidity_lab_normed, pt / A, weight);
     }
 
+    // fill coalescence
     if (this->h2_pta_rapidity_lab.count("coal_p") == 1)
     {
-        this->h2_pta_rapidity_lab["coal_p"]->Fill(rapidity_lab_normed, pt, weight * particle.Z);
+        this->h2_pta_rapidity_lab["coal_p"]->Fill(rapidity_lab_normed, pt / A, weight * particle.Z);
     }
     if (h2_pta_rapidity_lab.count("coal_n") == 1)
     {
-        this->h2_pta_rapidity_lab["coal_n"]->Fill(rapidity_lab_normed, pt, weight * particle.N);
+        this->h2_pta_rapidity_lab["coal_n"]->Fill(rapidity_lab_normed, pt / A, weight * particle.N);
     }
     return;
 }
