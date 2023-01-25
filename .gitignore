@@ -18,10 +18,6 @@ __pycache__/
 **/*.mod
 **/*.smod
 
-# Result, Data, old files
-*.root
-data
-
 # temp files
 .directory
 *.log
