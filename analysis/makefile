@@ -1,7 +1,6 @@
 COMPILER = g++
 INCLUDE := ${PROJECT_DIR}/src
 CFLAGS := -fPIC -O2
-# $(info    ${INCLUDE})
 
 .PHONY: clean
 
