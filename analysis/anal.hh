@@ -35,7 +35,8 @@ void Initialize_TChain(TChain *&chain, const std::vector<std::string> &input_pth
     {
         if (!fs::exists(pth))
         {
-            throw std::invalid_argument("path_data does not exist.");
+            std::string msg = Form("%s does not exist.", pth.c_str());
+            throw std::invalid_argument(msg.c_str());
         }
         chain->Add(pth.c_str());
     }
