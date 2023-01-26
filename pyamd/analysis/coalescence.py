@@ -72,10 +72,12 @@ class Coalescence:
         x = np.linspace(*range, bins+1)
         x = 0.5 * (x[1:] + x[:-1])
         
-        y = np.sum([df['y'] * zn[type == 'n'] for zn, df in rebinned_spectra.items()])
+        y = np.sum([
+            df['y'] * zn[type == 'n'] for zn, df in rebinned_spectra.items()
+        ], axis=0)
         yerr = np.sqrt(np.sum([
             df['y_err'] ** 2 * zn[type == 'n'] ** 2 for zn, df in rebinned_spectra.items()
-        ]))
+        ], axis=0))
 
         return pd.DataFrame({
             'x': x,
