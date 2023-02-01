@@ -44,7 +44,7 @@ class PtRapidityLAB:
 
     DIR = pathlib.Path(PROJECT_DIR, '/result/spectra')
     
-    def __init__(self, particle, path=None, reaction='Ca48Ni64E140', skyrme=None, mode:Literal['primary','secondary', 'secondary_one_decay']='secondary', impact_parameter=(0., 3.), uball_multiplicity=(1, 25), histname=None, verbose=1):
+    def __init__(self, particle, path=None, reaction='Ca48Ni64E140', skyrme=None, mode:Literal['primary','secondary', 'secondary_one_decay', 'experiment']='secondary', impact_parameter=(0., 3.), uball_multiplicity=(1, 25), histname=None, verbose=1):
         """ A class for handling TH2D tranverse momentum / A v.s. rapidity / beam-rapidity
         Parameters
         ----------
@@ -106,7 +106,7 @@ class PtRapidityLAB:
         if inplace:
             self.df = df
         return df
-
+    
     # def correct_coverage(self, df=None, xrange=(0.4, 0.6), yrange=(0., 600.)):
     #     df = self.query(df, xrange, yrange)
     #     df.query('z > 0.0', inplace=True)
