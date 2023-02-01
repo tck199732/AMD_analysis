@@ -79,12 +79,10 @@ class Expr:
         return f'{fcn_name}({Z_name}, {N_name})'
 
     @staticmethod
-    def transverse_magnitude(x_name, y_name):
-        return f'sqrt(pow({x_name}, 2.) + pow({y_name}, 2.))'
-
-    @staticmethod
-    def magnitude(x_name, y_name, z_name):
-        return f'sqrt(pow({x_name}, 2.) + pow({y_name}, 2.) + pow({z_name}, 2.))'
+    def magnitude(*args):
+        return 'sqrt(' + '+'.join([
+            f'pow({name}, 2.)' for name in args
+        ]) + ')'
 
     @staticmethod
     def kinergy(pmag_name, mass_name):
@@ -175,6 +173,12 @@ class RDataFrame_AMD:
         }
         return self._define_template(rules, inplace=inplace)
 
+    def redefine_quantity_for_nucleon(self, *args, A_name='A', operator:Literal['*', '/', '+', '-']='*', inplace=True):
+        rules = {
+            name : f'{name} {operator} {A_name}' for name in args
+        }
+        return self._define_template(rules=rules, inplace=inplace)
+
     def define_mass(self, fcn_name='DefineMass', br_name='mass', N_name='N', Z_name='Z', inplace=True):
 
         declare_mass_function(fcn_name=fcn_name)
@@ -185,7 +189,7 @@ class RDataFrame_AMD:
 
     def define_transverse_momentum(self, br_name='ptrans', px_name='px', py_name='py', inplace=True):
         rules = {
-            br_name: Expr.transverse_magnitude(px_name, py_name)
+            br_name: Expr.magnitude(px_name, py_name)
         }
         return self._define_template(rules, inplace=inplace)
 
@@ -253,6 +257,11 @@ class RDataFrame_AMD:
         }
         return self._define_template(rules, inplace=inplace)
 
+    def define_charged_particles(self, br_name='charged_particle', Z_name='Z', inplace=True):
+        rules = {
+            br_name : f'{Z_name} != 0'
+        }
+        return self._define_template(rules, inplace=inplace)
 
 """
 From here on are some analysis classes utilizing the above RDataFrame. User should get the instance of the analysis in a seperate script and call the `analyze` method to get a `ROOT.TH2D` object or pandas.dataframe. 
@@ -402,7 +411,7 @@ class Spacetime_Momentum(RDataFrame_AMD):
         super().__init__(path, tree, reaction)
 
     def _define_kinematics(self):
-        """ Before careful here, make sure the unit of `p` is correct (`MeV` or `MeV per nucleon`).
+        """ Be careful here, make sure the unit of `p` is correct (`MeV` or `MeV per nucleon`).
         """
         # quantities which are the same lab and cms frame
         self.define_transverse_momentum(
@@ -464,3 +473,39 @@ class Spacetime_Momentum(RDataFrame_AMD):
             results[par] = h2
 
         return results
+
+class Stopping(RDataFrame_AMD):
+    def __init__(self, path, tree='AMD', reaction='Ca40Ni58E140'):
+        super().__init__(path, tree, reaction)
+
+    def _define_kinematics(self):
+        self.define_mass_number(
+            br_name='A', Z_name='Z', N_name='N')
+
+        self.define_mass(br_name='mass', N_name='N', Z_name='Z')
+
+        self.redefine_quantity_for_nucleon('px', 'py', 'pz', A_name='A', operator='*')
+
+        self.define_transverse_momentum(br_name='ptrans')
+        self.define_kinergy(br_name='etrans', pmag_name='ptrans', mass_name='mass')
+        self.define_kinergy(br_name='elong', pmag_name='pz', mass_name='mass')
+        self.define_charged_particles(br_name='charged_particle', Z_name='Z')
+        
+
+    def analyze(self, hname='h1_stopping', bins=1000, range=[0.0,2.0], weight=1.):
+        
+        self._define_kinematics()
+        nevents = self.rdf.Count().GetValue()
+
+        h1 = (self.rdf.
+            Define('etrans_charged_particle', f'etrans[charged_particle]').
+            Define('elong_charged_particle', f'elong[charged_particle]').
+            Define('total_etrans_charged_particle', f'ROOT::VecOps::Sum(etrans_charged_particle)').
+            Define('total_elong_carged_particle', f'ROOT::VecOps::Sum(elong_charged_particle)').
+            Define('stopping', 'total_etrans_charged_particle / total_elong_carged_particle').
+            Histo1D((hname, '', bins, *range), 'stopping', f'{weight}')
+        ).GetValue()
+
+        h1.Scale(1. / (nevents * weight))
+
+        return h1
