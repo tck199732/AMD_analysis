@@ -9,8 +9,8 @@ from pyamd.utilities import misc
 This script collects AMD files as a nested dictionary. The naming convention of AMD files is `{beam}{target}_En{energy}MeV_{skyrme}_{statistics}k_{table}x.dat`, e.g. `Ca48Ni64_En140MeV_SkM_110k_table3.dat`. User provides the input directory containing these files, this program will collect the file names sorted by the statistics. For instance, ['Ca48Ni64E140']['SkM']['secondary'] = ['/data/Ca48Ni64_En140MeV_SkM_110k_table3.dat', '/data/Ca48Ni64_En140MeV_SkM_150k_table3.dat','/data/Ca48Ni64_En140MeV_SkM_300k_table3.dat']
 """
 
-# output_path = pathlib.Path(DATABASE, 'data/amdfiles_dec2021.pkl')
-# dat_dir = pathlib.Path(PROJECT_DIR, 'database/data/amd/dec2021/b3fm')
+output_path = pathlib.Path(DATABASE, 'data/amdfiles_dec2021.pkl')
+dat_dir = pathlib.Path(PROJECT_DIR, 'database/data/amd/dec2021/b3fm')
 
 ##########################################################################
 beam = ['Ca40', 'Ca48']
