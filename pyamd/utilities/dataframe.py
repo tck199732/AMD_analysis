@@ -37,6 +37,34 @@ class DataFrameHelper:
         df[label] = yferr
         return yferr
 
+    def multiply(self, a, b, calculate_error=True):
+        self.check_same_axis(a, b)
+        x = a['x'].to_numpy()
+        y = (a['y'] * b['y']).to_numpy()
+
+        if calculate_error:
+            if not ('y_err' in a.columns and 'y_err' in b.columns):
+                raise ValueError('input does not contain error information.')
+
+            self.check_error_information(a)
+            self.check_error_information(b)
+
+            if not 'y_ferr' in a.columns:
+                self.calculate_relative_error(a)
+
+            if not 'y_ferr' in b.columns:
+                self.calculate_relative_error(b)
+
+            yerr = y * np.sqrt(a['y_ferr']**2 + b['y_ferr']**2)
+
+        return pd.DataFrame({
+            'x': x,
+            'y': y,
+            'y_err': yerr,
+            'y_ferr': np.divide(yerr, y, where=(y != 0.0), out=np.zeros_like(yerr))
+        })
+        
+
     def ratio1d(self, num, den, calculate_error=True):
         """
         Parameters
