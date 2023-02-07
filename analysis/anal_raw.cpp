@@ -4,7 +4,16 @@ struct particle
 {
     int N, Z;
     // for raw data particle momenta are per nucleon
+    double px_per_A, py_per_A, pz_per_A;
+    int A;
     double px, py, pz;
+    void init()
+    {
+        this->A = this->N + this->Z;
+        this->px = this->px_per_A * (1. * this->A);
+        this->py = this->py_per_A * (1. * this->A);
+        this->pz = this->pz_per_A * (1. * this->A);
+    }
 };
 
 class Histograms
@@ -87,7 +96,7 @@ int main(int argc, char *argv[])
         for (int i = 0; i < amd.multi; i++)
         {
             particle particle = {amd.N[i], amd.Z[i], amd.px[i], amd.py[i], amd.pz[i]};
-
+            particle.init();
             if (ievt3 < nevents3 / NDECAYS)
             {
                 histo3_one_decay->fill(particle, betacms, beam_rapidity, 1.);
@@ -111,6 +120,7 @@ int main(int argc, char *argv[])
         {
             double A = amd.N[i] + amd.Z[i];
             particle particle = {amd.N[i], amd.Z[i], amd.px[i] * A, amd.py[i] * A, amd.pz[i] * A};
+            particle.init();
             histo21->fill(particle, betacms, beam_rapidity, 1.);
         }
     }
@@ -149,7 +159,7 @@ Histograms::Histograms(const std::string &suffix)
     for (const auto &pn : this->PARTICLENAMES)
     {
         std::string hname = Form("h2_pt_rapidity_%s_%s", suffix.c_str(), pn.c_str());
-        this->h2_pta_rapidity_lab[pn] = new TH2D(hname.c_str(), "", 300, -1.5, 1.5, 800, 0, 800);
+        this->h2_pta_rapidity_lab[pn] = new TH2D(hname.c_str(), "", 600, -3., 3., 800, 0, 800);
         this->h2_pta_rapidity_lab[pn]->Sumw2();
         this->h2_pta_rapidity_lab[pn]->SetDirectory(0);
     }
@@ -157,6 +167,7 @@ Histograms::Histograms(const std::string &suffix)
 
 void Histograms::fill(const particle &particle, const double betacms, const double &beam_rapidity, const double &weight)
 {
+    // here particle is treated as particle with total momenta
     std::string name = Physics::GetNucleiName(particle.Z, particle.Z + particle.N);
     double A = particle.Z + particle.N;
 
