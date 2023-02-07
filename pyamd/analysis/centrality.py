@@ -143,7 +143,7 @@ class Multiplicity_ImpactParameter:
         })
 
     def DifferentialCrossSection(self, range=(0., 10.), cut=(-0.5, 24.5), bins=20, unit=None):
-        """ Obtain differential cross section :math: `d\sigma/db`
+        """ Obtain differential cross section :math: `d\sigma/db`. Note that we assume the input histogram is normalized by **`pure simulation events`** not **`filtered events`**.
         Parameter
         ---------
         range : tuple of float
@@ -163,7 +163,6 @@ class Multiplicity_ImpactParameter:
 
         # first get total cross section \pi bmax^2 (fm^2)
         cs = np.pi * range[1]**2 * units.fm**2
-
         if unit is None:
             pass
         elif unit == 'mb':
