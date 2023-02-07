@@ -27,34 +27,25 @@ class Coalescence:
         triton_spectrum = df_helper.rebin1d(triton, bins=bins, range=range)
         helium3_spectrum = df_helper.rebin1d(helium3, bins=bins, range=range)
         
+        x = deuteron_spectrum['x']
 
         num = deuteron_spectrum['y'] * alpha_spectrum['y']
         den = triton_spectrum['y'] * helium3_spectrum['y']
 
-        T = np.divide(num, den, where=(
+        val = np.divide(num, den, where=(
             (num != 0.0) & (den != 0.0)), out=np.zeros_like(num))
 
-        err = T * np.sqrt(deuteron_spectrum['y_ferr']**2 + alpha_spectrum['y_ferr']
+        err = val * np.sqrt(deuteron_spectrum['y_ferr']**2 + alpha_spectrum['y_ferr']
                           ** 2 + triton_spectrum['y_ferr']**2 + helium3_spectrum['y_ferr']**2)
-        err = err / np.log(T, where=(T > 0.0))**2
 
-        T, err = (
-            14.3 / np.log(T, where=(T > 0.0)),
-            14.3 * np.divide(err, T, out=np.zeros_like(err), where=(T > 0.0))
-        )
+        T = 14.3 / np.log(1.59 * val, where=(val > 0.))
+        T_err = 14.3 * err / val / (np.log(1.59 * val, where=(val>0.))) ** 2.
 
-        T, bin_edges = np.histogram(
-            deuteron_spectrum['x'], bins=bins, range=range, weights=T)
-        err, bin_edges = np.histogram(
-            deuteron_spectrum['x'], bins=bins, range=range, weights=err**2)
-        err = np.sqrt(err)
-
-        x_edges = np.linspace(*range, bins+1)
         return pd.DataFrame({
-            'x': 0.5 * (x_edges[1:] + x_edges[:-1]),
+            'x' : x,
             'y': T,
-            'y_err': err,
-            'y_ferr': np.divide(err, T, out=np.zeros_like(err), where=(T > 0.0))
+            'y_err': T_err,
+            'y_ferr': np.divide(T_err, T, out=np.zeros_like(T_err), where=(T > 0.0))
         })
 
     @staticmethod
