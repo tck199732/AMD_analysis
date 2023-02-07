@@ -6,17 +6,14 @@ from pyamd.e15190 import e15190
 import pandas as pd
 import pathlib
 import itertools
-import collections
 import numpy as np
 from typing import Literal
 
 HistoReader = root6.HistogramReader()
 df_helper = dataframe.DataFrameHelper()
 
-
 ROOT.EnableImplicitMT()
 ame_table = ame.AME()
-
 
 def declare_mass_function(maxZ=25, maxN=25, fcn_name='DefineMass'):
     """ A global function for declaring a C++ function which takes `Z` and `N` and return the nuclei mass, which is obtained from the AME table. 
@@ -321,14 +318,24 @@ class ImpactParameter_Multiplicity(RDataFrame_AMD):
             raise Exception('invalid return_type.')
 
 
+# this class is only for testing purpose. It is more convenient to analyze in C++ as we need to replace errorbars later.
 class TransverseMomentum_RapidityLab(RDataFrame_AMD):
     """ Study transverse mometum :math: `P_{t}` vs :math: `\hat{y}_{lab}` rapidity / beam-rapidity. Same calculations are done for the light clusters `p`, `d`, `t`, `3He` and `4He`. Note that in this analysis the filtered data table3 is read. This means 10 decay events are simulated out of 1 primary event and thus the error calculation is underestimated. For correct error calculation, one can approximate by the error bar obtained from only analyzing 1 decay event for each primary event (See **`${Project_Dir}/analysis/spectra.cpp`**) 
     """
 
-    def __init__(self, path, tree='AMD', reaction='Ca40Ni58E140'):
+    def __init__(self, path, tree='AMD', reaction='Ca40Ni58E140', dtype:Literal['filtered', 'raw']='filtered'):
         super().__init__(path, tree, reaction)
+        self.dtype = dtype
 
     def _define_kinematics(self):
+        if self.dtype == 'filtered':
+            self._define_kinematics_filtered_data()
+        elif self.dtype == 'raw':
+            self._define_kinematics_raw_data()
+        else:
+            raise ValueError('Invalid `dtype`, must be `filtered` or `raw`.')
+
+    def _define_kinematics_filtered_data(self):
         # quantities which are the same lab and cms frame
         self.define_mass_number(
             br_name='hira_A', Z_name='hira_Z', N_name='hira_N')
@@ -354,7 +361,41 @@ class TransverseMomentum_RapidityLab(RDataFrame_AMD):
         self.define_normalized_rapidity(
             br_name='hira_rapidity_lab_normed', rapidity_name='hira_rapidity_lab')
 
-    def _filter_event(self, multi=(10, 25), bcut=(0., 10.), inplace=True):
+
+    def _define_kinematics_raw_data(self):
+        # quantities which are the same lab and cms frame
+        self.define_mass_number(br_name='A', Z_name='Z', N_name='N')
+        self.define_mass(br_name='mass', N_name='N', Z_name='Z')
+
+        # change unit to total momenta
+        self.redefine_quantity_for_nucleon('px', 'py', 'pz', A_name='A', operator='*')
+
+        self.define_transverse_momentum(br_name='ptrans', px_name='px', py_name='py')
+
+        # cms frame quantities
+        self.define_momentum(br_name='pmag', px_name='px', py_name='py', pz_name='pz')
+        self.define_kinergy(br_name='kinergy', pmag_name='pmag', mass_name='mass')
+
+        # lab frame quantities
+        self.define_pz_lab(br_name='pz_lab', pz_name='pz', kinergy_name='kinergy', mass_name='mass')
+        self.define_momentum(br_name='pmag_lab', px_name='px', py_name='py', pz_name='pz_lab')
+        self.define_kinergy(br_name='kinergy_lab', pmag_name='pmag_lab', mass_name='mass')
+        self.define_rapidity(br_name='rapidity_lab', kinergy_name='kinergy_lab', mass_name='mass', pz_name='pz_lab')
+        self.define_normalized_rapidity(br_name='rapidity_lab_normed', rapidity_name='rapidity_lab')
+    
+    def _filter_event(self):
+        if self.dtype == 'filtered':
+            self._filter_event_filtered_data()
+        elif self.dtype == 'raw':
+            self._filter_event_raw_data()
+
+    def _filter_event_raw_data(self, multi=(0, 100), bcut=(0., 10.), inplace=True):
+        uball_cut = f'multi >= {multi[0]} && multi <= {multi[1]}'
+        bcut = f'b >= {bcut[0]} && b < {bcut[1]}'
+        return self._filter_template(uball_cut, bcut, inplace=inplace)
+
+
+    def _filter_event_filtered_data(self, multi=(10, 25), bcut=(0., 10.), inplace=True):
         uball_cut = f'uball_multi >= {multi[0]} && uball_multi <= {multi[1]}'
         bcut = f'b >= {bcut[0]} && b < {bcut[1]}'
         return self._filter_template(uball_cut, bcut, inplace=inplace)
@@ -371,7 +412,9 @@ class TransverseMomentum_RapidityLab(RDataFrame_AMD):
         ------
         dict of ROOT.TH2D
         """
+
         self._filter_event(multi, bcut, inplace=True)
+
         self._define_kinematics()
 
         particles = [
@@ -401,7 +444,6 @@ class TransverseMomentum_RapidityLab(RDataFrame_AMD):
             results[par] = h2
 
         return results
-
 
 class Spacetime_Momentum(RDataFrame_AMD):
     """ Study `emission time` and `emission size` vs `Momentum`. The spacetime information can only be extracted from primary data with suffix `table21t.root`. 
