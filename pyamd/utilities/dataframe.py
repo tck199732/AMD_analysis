@@ -42,29 +42,29 @@ class DataFrameHelper:
         Parameters
         ----------
         num : pd.DataFrame
+            numerator 
         den : pd.DataFrame
+            denominator
         """
-        df1 = num.copy()
-        df2 = den.copy()
-        self.check_same_axis(df1, df2)
+        self.check_same_axis(num, den)
 
-        x = df1.x.to_numpy()
-        y = np.where((df1.y != 0.0), df2.y / df1.y, 0.0)
+        x = num.x.to_numpy()
+        y = np.where((den.y != 0.0), num.y / den.y, 0.0)
 
         if calculate_error:
-            if not ('y_err' in df1.columns and 'y_err' in df2.columns):
+            if not ('y_err' in num.columns and 'y_err' in den.columns):
                 raise ValueError('input does not contain error information.')
 
-            self.check_error_information(df1)
-            self.check_error_information(df2)
+            self.check_error_information(num)
+            self.check_error_information(den)
 
-            if not 'y_ferr' in df1.columns:
-                self.calculate_relative_error(df1)
+            if not 'y_ferr' in num.columns:
+                self.calculate_relative_error(num)
 
-            if not 'y_ferr' in df2.columns:
-                self.calculate_relative_error(df2)
+            if not 'y_ferr' in den.columns:
+                self.calculate_relative_error(den)
 
-            yerr = y * np.sqrt(df1['y_ferr']**2 + df2['y_ferr']**2)
+            yerr = y * np.sqrt(num['y_ferr']**2 + den['y_ferr']**2)
 
         return pd.DataFrame({
             'x': x,
