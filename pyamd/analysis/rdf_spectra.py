@@ -139,14 +139,13 @@ class RDataFrame_AMD:
         """
 
         self.reaction = reaction
-        self.column_names = set()
 
         if isinstance(path, str) or isinstance(path, pathlib.Path):
             self.rdf = ROOT.RDataFrame(tree, str(path))
         elif isinstance(path, list):
             self.rdf = ROOT.RDataFrame(tree, list(map(str, path)))
 
-        self.column_names.update(self.rdf.GetColumnNames())
+        self.column_names = set(self.rdf.GetColumnNames())
 
     def _define_template(self, rules, forced=False, inplace=True):
         for br, rule in rules.items():
@@ -235,7 +234,7 @@ class RDataFrame_AMD:
         }
         return self._define_template(rules, inplace=inplace)
 
-    def define_normalized_rapidity_lab(self, br_name='rapidity_lab_normed', rapidity_name='rapidity_lab', beam_rapidity=None, inplace=True):
+    def define_normalized_rapidity(self, br_name='rapidity_lab_normed', rapidity_name='rapidity_lab', beam_rapidity=None, inplace=True):
         if beam_rapidity is None:
             beam_rapidity = e15190.CollisionReaction.get_rapidity_beam(
                 self.reaction)
@@ -265,11 +264,17 @@ class RDataFrame_AMD:
 
 """
 From here on are some analysis classes utilizing the above RDataFrame. User should get the instance of the analysis in a seperate script and call the `analyze` method to get a `ROOT.TH2D` object or pandas.dataframe. 
+Analysis for filtered data
+--------------------------
 1. ImpactParameter_Multiplicity : 2D histogram `impact-parameter vs uball charged-multiplicity`
+2. TransverseMomentum_RapidityLab : 2D histogram `Pt vs rapidity / beam-rapidity (lab)`
+
+Analysis for pure data
+----------------------
+1. Stopping : 1D histogram of total Et / Ez of each event. 
 2. TransverseMomentum_RapidityLab : 2D histogram `Pt vs rapidity / beam-rapidity (lab)`
 3. SpaceTime : 2D histogram `Emission Time vs Momentum`
 """
-
 
 class ImpactParameter_Multiplicity(RDataFrame_AMD):
     """ A class for analyzing impact-parameter vs charged-particle multiplicity detected in microball. Since all the data we need would be `b` and `uball_multi`, we directly inherit the class RDataFrame_AMD and construct 2D histogram.
@@ -298,7 +303,9 @@ class ImpactParameter_Multiplicity(RDataFrame_AMD):
         # 1 primary event -> 10 secondary events
         weight = 0.1
 
-        nevents = self.rdf.Filter(f'{br_names[0]} > 0').Count().GetValue() * weight
+        # nevents = self.rdf.Filter(f'{br_names[0]} > 0').Count().GetValue() * weight
+        # bug fix, should normalize by pure simulation event
+        nevents = self.rdf.Count().GetValue() * weight
         h2 = (self.rdf
               .Filter(f'{br_names[0]} > 0')
               .Define('weight', f'{weight}')
@@ -344,7 +351,7 @@ class TransverseMomentum_RapidityLab(RDataFrame_AMD):
                             pmag_name='hira_pmag_lab', mass_name='hira_mass')
         self.define_rapidity(br_name='hira_rapidity_lab', kinergy_name='hira_kinergy_lab',
                              mass_name='hira_mass', pz_name='hira_pz_lab')
-        self.define_normalized_rapidity_lab(
+        self.define_normalized_rapidity(
             br_name='hira_rapidity_lab_normed', rapidity_name='hira_rapidity_lab')
 
     def _filter_event(self, multi=(10, 25), bcut=(0., 10.), inplace=True):
@@ -483,29 +490,85 @@ class Stopping(RDataFrame_AMD):
             br_name='A', Z_name='Z', N_name='N')
 
         self.define_mass(br_name='mass', N_name='N', Z_name='Z')
-
         self.redefine_quantity_for_nucleon('px', 'py', 'pz', A_name='A', operator='*')
-
+        
         self.define_transverse_momentum(br_name='ptrans')
         self.define_kinergy(br_name='etrans', pmag_name='ptrans', mass_name='mass')
         self.define_kinergy(br_name='elong', pmag_name='pz', mass_name='mass')
         self.define_charged_particles(br_name='charged_particle', Z_name='Z')
-        
 
     def analyze(self, hname='h1_stopping', bins=1000, range=[0.0,2.0], weight=1.):
         
         self._define_kinematics()
         nevents = self.rdf.Count().GetValue()
-
         h1 = (self.rdf.
             Define('etrans_charged_particle', f'etrans[charged_particle]').
             Define('elong_charged_particle', f'elong[charged_particle]').
             Define('total_etrans_charged_particle', f'ROOT::VecOps::Sum(etrans_charged_particle)').
             Define('total_elong_carged_particle', f'ROOT::VecOps::Sum(elong_charged_particle)').
             Define('stopping', 'total_etrans_charged_particle / total_elong_carged_particle').
-            Histo1D((hname, '', bins, *range), 'stopping', f'{weight}')
+            Define('weight', f'{weight}').
+            Histo1D((hname, '', bins, *range), 'stopping', 'weight')
         ).GetValue()
 
         h1.Scale(1. / (nevents * weight))
 
         return h1
+
+class Rapidity_Distribution(RDataFrame_AMD):
+    def __init__(self, path, tree='AMD', reaction='Ca40Ni58E140'):
+        super().__init__(path, tree, reaction)
+    
+    def _define_kinematics(self):
+        
+        # change unit to total momenta
+        self.redefine_quantity_for_nucleon('px', 'py', 'pz', A_name='A', operator='*')
+
+        # quantities which are the same lab and cms frame
+        self.define_mass(br_name='mass', N_name='N', Z_name='Z')
+        
+        # cms frame quantities
+        self.define_momentum(
+            br_name='pmag', px_name='px', py_name='py', pz_name='pz')
+        self.define_kinergy(br_name='kinergy',
+                            pmag_name='pmag', mass_name='mass')
+
+        # lab frame quantities
+        self.define_pz_lab(br_name='pz_lab', pz_name='pz',
+                           kinergy_name='kinergy', mass_name='mass')
+        self.define_momentum(br_name='pmag_lab', px_name='px',
+                             py_name='py', pz_name='pz_lab')
+        self.define_kinergy(br_name='kinergy_lab',
+                            pmag_name='pmag_lab', mass_name='mass')
+        self.define_rapidity(br_name='rapidity_lab', kinergy_name='kinergy_lab',
+                             mass_name='mass', pz_name='pz_lab')
+
+        self.define_normalized_rapidity(
+            br_name='rapidity_lab_normed', rapidity_name='rapidity_lab')
+    
+    def analyze(self, hname='h1_rapidity_lab_normed', bins=400, range=[-2.,2.], weight=1.):
+        
+        self._define_kinematics()
+        nevents = self.rdf.Count().GetValue()
+
+        results = dict()
+        particles = [
+            'proton',
+            'deuteron',
+            'triton',
+            'Helium3',
+            'Helium4',
+        ]
+
+        for par in particles:
+            self.define_particle(br_name=par, Z_name='Z', N_name='N', inplace=True)
+            h1 = (self.rdf.
+                Define('weight', f'{weight}').
+                Define(f'rapidity_lab_normed_{par}', f'rapidity_lab_normed[{par}]').
+                Histo1D((f'{hname}_{par}', '', bins, *range), f'rapidity_lab_normed_{par}', 'weight')
+            ).GetValue()
+
+            h1.Scale(1. / (nevents * weight))
+            results[par] = h1
+
+        return results
