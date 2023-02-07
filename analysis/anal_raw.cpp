@@ -118,8 +118,7 @@ int main(int argc, char *argv[])
         }
         for (unsigned int i = 0; i < amd.multi; i++)
         {
-            double A = amd.N[i] + amd.Z[i];
-            particle particle = {amd.N[i], amd.Z[i], amd.px[i] * A, amd.py[i] * A, amd.pz[i] * A};
+            particle particle = {amd.N[i], amd.Z[i], amd.px[i], amd.py[i], amd.pz[i]};
             particle.init();
             histo21->fill(particle, betacms, beam_rapidity, 1.);
         }
@@ -168,10 +167,9 @@ Histograms::Histograms(const std::string &suffix)
 void Histograms::fill(const particle &particle, const double betacms, const double &beam_rapidity, const double &weight)
 {
     // here particle is treated as particle with total momenta
-    std::string name = Physics::GetNucleiName(particle.Z, particle.Z + particle.N);
-    double A = particle.Z + particle.N;
+    std::string name = Physics::GetNucleiName(particle.Z, particle.A);
 
-    double mass = Physics::GetNucleiMass(particle.Z, A);
+    double mass = Physics::GetNucleiMass(particle.Z, particle.A);
     double pt = Physics::GetPt(particle.px, particle.py);
     double p = Physics::GetP(pt, particle.pz);
     double kinergy = Physics::GetEkin(mass, p);
@@ -186,17 +184,17 @@ void Histograms::fill(const particle &particle, const double betacms, const doub
 
     if (this->h2_pta_rapidity_lab.count(name) == 1)
     {
-        this->h2_pta_rapidity_lab[name]->Fill(rapidity_lab_normed, pt / A, weight);
+        this->h2_pta_rapidity_lab[name]->Fill(rapidity_lab_normed, pt / particle.A, weight);
     }
 
     // fill coalescence
     if (this->h2_pta_rapidity_lab.count("coal_p") == 1)
     {
-        this->h2_pta_rapidity_lab["coal_p"]->Fill(rapidity_lab_normed, pt / A, weight * particle.Z);
+        this->h2_pta_rapidity_lab["coal_p"]->Fill(rapidity_lab_normed, pt / particle.A, weight * particle.Z);
     }
     if (h2_pta_rapidity_lab.count("coal_n") == 1)
     {
-        this->h2_pta_rapidity_lab["coal_n"]->Fill(rapidity_lab_normed, pt / A, weight * particle.N);
+        this->h2_pta_rapidity_lab["coal_n"]->Fill(rapidity_lab_normed, pt / particle.A, weight * particle.N);
     }
     return;
 }
