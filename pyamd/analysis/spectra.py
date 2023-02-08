@@ -26,6 +26,7 @@ df_helper = dataframe.DataFrameHelper()
 hist_reader = root6.HistogramReader()
 
 class PtRapidityLAB:
+    # not used, just a record
     lab_theta_range = (30.0, 75.0)  # degree
     lab_kinergy_per_A_ranges = {  # MeV/A
         'p': (20.0, 198.0),
@@ -160,6 +161,21 @@ class PtRapidityLAB:
             'y_ferr':  np.divide(histerr, hist, out=np.zeros_like(histerr), where=(hist != 0.0))
         })
 
+    def RapidityDistribution(self, xrange=(0,1), yrange=(0,800), bins=100):
+        """ Project to X-axis to get distribution of `rapidity_lab` / `beam_rapidity`
+        """
+        df = self.df.query(f'x > {xrange[0]} & x <= {xrange[1]} & y > {yrange[0]} & y <= {yrange[1]}')
+        hist, _ = np.histogram(df['x'], weights=df['z'], bins=bins, range=xrange)
+        hist_err, _ = np.histogram(df['x'], weights=df['z_err']**2, bins=bins, range=xrange)
+        hist_err = np.sqrt(hist_err)
+        
+        x = np.linspace(*xrange, bins+1)
+        return pd.DataFrame({
+            'x' : 0.5 * (x[1:] + x[:-1]),
+            'y' : hist,
+            'y_err' : hist_err,
+            'y_ferr' : np.divide(hist_err, hist, where=(hist!=0.))
+        })
 
 """
     def RapidityCMS(self, range=(-0.5, 0.5), bins=100):
@@ -345,17 +361,5 @@ class EkinThetaCMS:
             'y_err': histerr / norm,
             'y_ferr': np.divide(histerr, hist, out=np.zeros_like(histerr), where=(hist > 0.0))
         })
-
-    def plotEkinCMS(self, ax=None, range=(0, 200), bins=50, **kwargs):
-        df = self.EkinCMS(xrange=range, bins=bins)
-        return df_helper.plot1d(ax, df, **kwargs)
-
-    def plotThetaCMS(self, ax=None, range=(40, 140), bins=100, **kwargs):
-        df = self.ThetaCMS(yrange=range, bins=bins)
-        return df_helper.plot1d(ax, df, **kwargs)
-
-    def plotEkinThetaCMS(self, ax=None, range=[[0, 200], [40, 140]], bins=[50, 100], **kwargs):
-        df = self.query(xrange=range[0], yrange=range[1])
-        return df_helper.plot2d(ax, df, range=range, bins=bins, **kwargs)
 
 """
