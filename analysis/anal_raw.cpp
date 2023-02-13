@@ -66,6 +66,8 @@ int main(int argc, char *argv[])
         std::cout << "nevents21 : " << nevents21 << std::endl;
         std::cout << "nevents3  : " << nevents3 << std::endl;
         std::cout << "uball-multiplicity cut : >=" << argparser.cut_on_uball_charged_particles << std::endl;
+        std::cout << "impact-parameter cut : " << argparser.impact_parameter[0] << " " << argparser.impact_parameter[1] << std::endl;
+
         std::cout << "--------------------------------------------------------------------" << std::endl;
     }
 
@@ -80,7 +82,7 @@ int main(int argc, char *argv[])
     {
         chain3->GetEntry(ievt3);
 
-        if (amd.multi >= argparser.cut_on_uball_charged_particles)
+        if (amd.multi >= argparser.cut_on_uball_charged_particles && amd.b >= argparser.impact_parameter[0] && amd.b <= argparser.impact_parameter[1])
         {
             norm_table3 += 1. / NDECAYS;
             if (ievt3 < nevents3 / NDECAYS)
@@ -112,7 +114,7 @@ int main(int argc, char *argv[])
     for (int ievt21 = 0; ievt21 < nevents21; ievt21++)
     {
         chain21->GetEntry(ievt21);
-        if (amd.multi >= argparser.cut_on_uball_charged_particles)
+        if (amd.multi >= argparser.cut_on_uball_charged_particles && amd.b >= argparser.impact_parameter[0] && amd.b <= argparser.impact_parameter[1])
         {
             norm_table21 += 1.;
         }

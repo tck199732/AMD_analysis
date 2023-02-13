@@ -4,6 +4,7 @@
 #include <vector>
 #include <string>
 #include <map>
+#include <sstream>
 #include <unistd.h>
 #include <filesystem>
 namespace fs = std::filesystem;
@@ -75,6 +76,7 @@ public:
     std::vector<std::string> input_files_table21;
     std::vector<std::string> input_files_table3;
     int cut_on_uball_charged_particles = 0;
+    std::array<double, 2> impact_parameter = {0., 3.};
     int verbose = 0;
     ArgumentParser(int argc, char *argv[])
     {
@@ -84,7 +86,7 @@ public:
         // When getopt encounters an unknown option character or an option with a missing required argument, it stores that option character in this variable. You can use this for providing your own diagnostic messages.
         // optopt;
         int opt;
-        while ((opt = getopt(argc, argv, "hvr:f:p:o:c:")) != -1)
+        while ((opt = getopt(argc, argv, "hvr:f:p:o:c:b:")) != -1)
         {
             switch (opt)
             {
@@ -143,7 +145,13 @@ public:
                 }
                 break;
             }
-
+            case 'b':
+            {
+                std::string cut_on_bfm = optarg;
+                std::istringstream iss(cut_on_bfm);
+                iss >> this->impact_parameter[0] >> this->impact_parameter[1];
+                break;
+            }
             case '?':
             {
                 std::cout << "Got unknown option." << std::endl;
