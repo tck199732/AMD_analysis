@@ -78,7 +78,7 @@ class DatabaseSQL:
 
         return existing_row is not None
 
-    def add_dataframe(self, dataframe, forced_update=True, **kwargs):
+    def add_dataframe(self, dataframe, forced_update=False, **kwargs):
         """ Add a dataframe to the database.
         Parameters
         ----------
@@ -118,8 +118,8 @@ class DatabaseSQL:
         """
 
         if self._exists(**kwargs):
-            query = f'SELECT {self.df_name} FROM dataframes WHERE ' + ' '.join([
-                f'{name}=? AND' for name in kwargs.keys()
+            query = f'SELECT {self.df_name} FROM dataframes WHERE ' + ' AND '.join([
+                f'{name}=?' for name in kwargs.keys()
             ])
             values = tuple(kwargs.values())
             dataframe_bytes = self.cursor.execute(query, values).fetchone()[0]
