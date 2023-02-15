@@ -59,7 +59,7 @@ class DatabaseSQL:
             if not key in self.columns.keys():
                 raise ValueError(f'Invalid column name: {key}')
 
-    def _exists(self, **kwargs):
+    def exists(self, **kwargs):
         """ Check if a row exists in the database.
         Parameters
         ----------
@@ -92,11 +92,11 @@ class DatabaseSQL:
         # convert dataframe to bytes
         dataframe_bytes = pickle.dumps(dataframe)
 
-        if self._exists(**kwargs):
+        if self.exists(**kwargs):
             if not forced_update:
                 return
-            query = f'UPDATE dataframes SET {self.df_name}=? ' + ' '.join([
-                f'AND {name}=?' for name in kwargs.keys()
+            query = f'UPDATE dataframes SET {self.df_name}=? ' + ' AND '.join([
+                f'{name}=?' for name in kwargs.keys()
             ])
             values = (dataframe_bytes, ) + tuple(kwargs.values())
         else:
@@ -117,7 +117,7 @@ class DatabaseSQL:
             The values of the columns to check.
         """
 
-        if self._exists(**kwargs):
+        if self.exists(**kwargs):
             query = f'SELECT {self.df_name} FROM dataframes WHERE ' + ' AND '.join([
                 f'{name}=?' for name in kwargs.keys()
             ])
