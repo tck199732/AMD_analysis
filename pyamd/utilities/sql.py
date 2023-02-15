@@ -4,7 +4,7 @@ import sqlite3
 import pandas as pd
 
 class DatabaseSQL:
-    def __init__(self, fname, columns, df_name='dataframe', primary_key='id', overwrite=False):
+    def __init__(self, fname, columns=None, df_name='dataframe', primary_key='id', mode='a'):
         """ Initialize a database with a table and columns.
         Parameters
         ----------
@@ -16,38 +16,43 @@ class DatabaseSQL:
             The name of the column that will store dataframes.
         primary_key : str
             The name of the primary key column.
-        overwrite : bool
-            If True, the table will be created even if it already exists.
+        mode : str
+            The mode to open the database in. Can be 'a' for append or 'w' for write or 'r' for read.
         """
 
+        
         self.fname = fname
+        self.mode = mode
         self.df_name = df_name
         self.primary_key = primary_key
-
-        if not df_name in columns.keys():
-            columns[df_name] = 'BLOB'
-
-        if primary_key in columns.keys():
-            ptype = columns[primary_key]
-        else:
-            ptype = 'INTEGER'
-        ptype = f'{ptype} PRIMARY KEY'
-
         self.columns = columns
+
         self.connection = sqlite3.connect(self.fname)
         self.cursor = self.connection.cursor()
 
-        # create table with columns
-        execute_str = ',\n'.join([
-            f'{name} {type}' for name, type in columns.items() if not name == primary_key
-        ])
+        if mode == 'w' or mode == 'a':
+            if not df_name in self.columns.keys():
+                self.columns[df_name] = 'BLOB'
 
-        execute_str = f'{primary_key} {ptype},\n' + execute_str
-        print(f'CREATE TABLE IF NOT EXISTS dataframes\n({execute_str})')
-        if overwrite:
-            self.cursor.execute('DROP TABLE IF EXISTS dataframes')
-        self.cursor.execute(f'CREATE TABLE IF NOT EXISTS dataframes\n({execute_str})')
-    
+            if primary_key in self.columns.keys():
+                ptype = self.columns[primary_key]
+            else:
+                ptype = 'INTEGER'
+            ptype = f'{ptype} PRIMARY KEY'
+
+            # create table with columns
+            execute_str = ',\n'.join([
+                f'{name} {type}' for name, type in columns.items() if not name == primary_key
+            ])
+
+            execute_str = f'{primary_key} {ptype},\n' + execute_str
+            if mode == 'w':
+                self.cursor.execute('DROP TABLE IF EXISTS dataframes')
+            
+            self.cursor.execute(f'CREATE TABLE IF NOT EXISTS dataframes\n({execute_str})')
+
+        
+        
     def _valid_columns(self, **kwargs):
         """ Check if kwargs are valid columns.
         Parameters
@@ -116,15 +121,14 @@ class DatabaseSQL:
         kwargs : dict
             The values of the columns to check.
         """
-
-        if self.exists(**kwargs):
+        try:
             query = f'SELECT {self.df_name} FROM dataframes WHERE ' + ' AND '.join([
                 f'{name}=?' for name in kwargs.keys()
             ])
             values = tuple(kwargs.values())
             dataframe_bytes = self.cursor.execute(query, values).fetchone()[0]
             dataframe = pickle.loads(dataframe_bytes)
-        else:
+        except:
             dataframe = None
 
         return dataframe
