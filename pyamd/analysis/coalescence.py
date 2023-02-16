@@ -15,7 +15,7 @@ class Coalescence:
         proton_spectra = df_helper.rebin1d(proton, bins=bins, range=range)
         triton_spectra = df_helper.rebin1d(triton, bins=bins, range=range)
         helium3_spectra = df_helper.rebin1d(helium3, bins=bins, range=range)
-        return df_helper.ratio1d(helium3_spectra, df_helper.product1d(proton_spectra, triton_spectra))
+        return df_helper.ratio1d(helium3_spectra, df_helper.multiply(proton_spectra, triton_spectra))
 
     @staticmethod
     def chemical_temperature(
