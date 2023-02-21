@@ -4,10 +4,11 @@ from typing import Literal
 import iminuit
 
 from pyamd.e15190 import e15190
-from pyamd.utilities import dataframe, minuit
-df_helper = dataframe.DataFrameHelper()
+from pyamd.utilities import minuit
 
 class Isoscaling:
+    """ A class for handling the fitting of the isoscaling relation :math: `R_{21} = C exp(N\\alpha + Z\\beta)`. After setting up the data, i.e. R21 ratio for different particles, the fit is performed by assuming a fixed normalization `C` for all data points. Then, the best normalization is found by iterating over a range of `C` and fitting the data. Finally, the global fit is performed using the best normalization. The result is stored in the attributes `chi2`, `param_names`, `param_values`, `param_errors`. The predicted R21 ratio for a particle with proton Z and neutron N can be calculated by calling `predict` method. This class relies on `iminuit` package for the fitting but also include the equivalent implementation using ROOT.TMinut. The ROOT version is not recommended as it is much slower than the iminuit version.
+    """
     def __init__(self):
         self.r21 = dict()
         # minuit attributes to be stored later
@@ -27,7 +28,6 @@ class Isoscaling:
     @staticmethod
     def model_error(Z, N, norm, alpha, beta, norm_err, alpha_err, beta_err):
         return Isoscaling.model(Z, N, norm, alpha, beta) * np.sqrt(N**2 * alpha_err**2 + Z**2 * beta_err**2 + norm_err**2 / norm**2)
-
 
     def _fit(self, X, init_norm=1.0, init_alpha=0.5, init_beta=-0.5, **kwargs):
         """ isoscaling fit for one Pt 
@@ -65,6 +65,8 @@ class Isoscaling:
 
     def fit(self, X, method:Literal['iterate','free']='iterate', norm_step_size=0.01, norm_range=(0.7,1.2)):
         """ performa a global isoscaling fit for all data points
+        Parameters
+        ----------
         X : np.ndarray
             X[0] : [(Z, N)]
             X[1] : [[y]]
@@ -121,7 +123,11 @@ class Isoscaling:
 
     def predict(self, X):
         """ Calculate isoscaling R21 for a particle with proton Z and neutron N
-        X : Z, N
+        Parameters
+        ----------
+        X : np.ndarray
+            X[0] : Z
+            X[1] : N
         """
         y = Isoscaling.model(*X, self.param_values['norm'], self.param_values['alpha'], self.param_values['beta'])
         yerr = Isoscaling.model_error(*X, self.param_values['norm'], self.param_values['alpha'], self.param_values['beta'], self.param_errors['norm'], self.param_errors['alpha'], self.param_errors['beta'])
@@ -200,11 +206,7 @@ class Isoscaling:
             if self.chisq < chisq_:
                 norm_ = x
                 chisq_ = self.chisq
-
         return norm_
-
-
-
 
     def predict_TMinuit(self, particle):
         df = self.r21[particle].copy()
@@ -222,43 +224,3 @@ class Isoscaling:
             'y_ferr': np.divide(
                 yerr, y, where=(y != 0.0), out=np.zeros_like(yerr))
         })
-
-
-
-    # def plotIsoscaling(self, ax=None, particle=None, **kwargs):
-    #     if particle is None:
-    #         raise ValueError('particle not given')
-
-    #     df = self.predict(particle)
-    #     if ax is None:
-    #         ax = plt.gca()
-    #     ax.fill_between(df.x, df.y-df['y_err'], df.y+df['y_err'], **kwargs)
-    #     # ax.errorbar(df.x, df.y, yerr=df['y_err'], **kwargs)
-    #     return ax
-
-    def plotChemPotentialAlpha(self, ax=None, **kwargs):
-        df = self.r21['p'].copy()
-        df.query(
-            f'x >= {self.range_in_fit[0]} & x <= {self.range_in_fit[1]}', inplace=True)
-        x = df.x.to_numpy()
-
-        df = pd.DataFrame({
-            'x': x,
-            'y': self.alpha,
-            'y_err': self.alpha_err,
-            'y_ferr': np.divide(self.alpha_err, self.alpha, where=(self.alpha != 0.0), out=np.zeros_like(self.alpha_err))
-        })
-        return df_helper.plot1d(ax, df, **kwargs)
-
-    def plotChemPotentialBeta(self, ax=None, **kwargs):
-        df = self.r21['p'].copy()
-        df.query(
-            f'x >= {self.range_in_fit[0]} & x <= {self.range_in_fit[1]}', inplace=True)
-        x = df.x.to_numpy()
-        df = pd.DataFrame({
-            'x': x,
-            'y': self.beta,
-            'y_err': self.beta_err,
-            'y_ferr': np.divide(self.beta_err, self.beta, where=(self.beta != 0.0), out=np.zeros_like(self.beta_err))
-        })
-        return df_helper.plot1d(ax, df, drop_zeros=True, **kwargs)
