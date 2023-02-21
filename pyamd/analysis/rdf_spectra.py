@@ -1,18 +1,15 @@
 import ROOT
-import matplotlib.pyplot as plt
-from pyamd import PROJECT_DIR
-from pyamd.utilities import ame, dataframe, root6
-from pyamd.e15190 import e15190
-import pandas as pd
 import pathlib
 import itertools
 import numpy as np
+import pandas as pd
 from typing import Literal
 
-HistoReader = root6.HistogramReader()
-df_helper = dataframe.DataFrameHelper()
+from pyamd.utilities import ame, root6
+from pyamd.e15190 import e15190
 
 ROOT.EnableImplicitMT()
+HistoReader = root6.HistogramReader()
 ame_table = ame.AME()
 
 def declare_mass_function(maxZ=25, maxN=25, fcn_name='DefineMass'):
