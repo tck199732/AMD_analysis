@@ -1,26 +1,37 @@
 import pathlib
+import warnings
 import numpy as np
-import collections
 import pandas as pd
-import matplotlib.pyplot as plt
 import matplotlib as mpl
-from typing import Literal
+import matplotlib.pyplot as plt
+from scipy.optimize import curve_fit
 
 from pyamd import DATABASE
 from pyamd.utilities import style
 style.set_matplotlib_style(mpl)
 
-
 class microball:
-
+    """ A class to handle the geometry and acceptance (in MeV for each ring) of the microball detector.
+    """
+    MAX_A = 100
+    MAX_Z = 100
     def __init__(self, path=None, coordinate='uball'):
+        """
+        Parameters
+        ----------
+        path : str
+            Path to the geometry file, the file contains the following columns: ring, det, theta_min, theta_max, phi_min and phi_max
+        coordinate : str
+            'uball' : default
+            'hira' : rotate :math: `\phi` angle by 90 degrees.
+        """
         if path is None:
             path = pathlib.Path(DATABASE, 'e15190/microball/acceptance/geometry.dat')
         
         self.coordinate = coordinate
         self.geometry = self._read_geometry(path, coordinate)
         self.configuration = dict()
-        self.threshold = collections.defaultdict(dict)
+        self.threshold = dict()
 
         self.configurated = False
     
@@ -51,9 +62,16 @@ class microball:
 
     def get_phi_range(self, ring, det):
         return self.geometry.loc[ring, det]['phi_min'], self.geometry.loc[ring, det]['phi_max']
-
     
     def configurate(self, path=None, reaction='Ca48Ni64E140'):
+        """ configurate according to the `ring` and `det` used in the experiment.
+        Parameters
+        ----------
+        path : str
+            Path to the configuration file. The file has the following format: `system`, `ring` and a list of `det` separated by space.
+        reaction : str
+            Reaction name, e.g. `Ca48Ni64E140`
+        """
         if path is None:
             path = pathlib.Path(DATABASE, 'e15190/microball/acceptance/config.dat')
         with open(str(path), 'r') as f:
@@ -73,9 +91,7 @@ class microball:
         self.configurated = True
         return self.geometry
 
-                
     def plot_coverage(self, cmap='viridis', **kwargs):
-        
         figdict = dict(
             figsize = (6,4),
         )
@@ -116,12 +132,22 @@ class microball:
             ax.set(xlim=(0,360), ylim=(0,160))
 
         plt.tight_layout()
-
         return fig, ax
 
-
-    def set_threshold(self, ring=2, path=None):
-        """
+    def set_threshold(self, ring=2, path=None, maxA=None, maxZ=None):
+        """ Set the threshold energy (MeV) for the specified ring according to the threshold file. In the file, the first column is the `A` of the target, the second column is the `Z` of the target, and the third column is the threshold energy (MeV). If the `A` and `Z` of the target are not found in the file, the threshold energy will be interpolated from the nearest `A` and `Z` values. 
+        Parameters
+        ----------
+        ring : int
+            Ring number.
+        path : str
+            Path to the threshold file. The file has the following format: `A`, `Z` and `threshold` separated by space.
+        maxA : int, optional
+            Maximum `A` of the target. 
+        maxZ : int, optional
+            Maximum `Z` of the target.
+        Examples
+        --------
         set_threshold(2, threshold_Sn_65mgcm2.dat)
         set_threshold(3, threshold_Sn_58mgcm2.dat)
         set_threshold(4, threshold_Sn_50mgcm2.dat)
@@ -132,42 +158,36 @@ class microball:
         if path is None:
             path = pathlib.Path(DATABASE, 'e15190/microball/acceptance/threshold_Sn_65mgcm2.dat')
         
-        df = pd.read_csv(str(path), delim_whitespace=True)
-        df.columns = ['A', 'Z', 'threshold']
-        df.set_index(['A', 'Z'])
-        
-        for AZ, row in df.iterrows():
-            self.threshold[ring] = float(row[AZ]['threshold'])
-        
-        # here, do a fit to extend the data, to be done later.
+        df = pd.read_csv(str(path), delim_whitespace=True, usecols=[0,1,2])
+        df.columns = ['A', 'Z', 'kinergy_MeV']
 
-        return
+        maxA = self.MAX_A if maxA is None else maxA
+        maxZ = self.MAX_Z if maxZ is None else maxZ
+
+        for Z, subdf in df.groupby('Z'):
+            a = subdf['A'].to_numpy()
+            e = subdf['kinergy_MeV'].to_numpy()
+            # interpolate and extrapolate the threshold energy
+        
+
+        # setting self.thereshld[ring] = df
 
     def get_threshold(self, ring, A, Z):
-        
         if not ring in self.threshold:
             raise ValueError('Not yet set up threshold data.')
+        if not A >= Z:
+            raise ValueError('A must be greater than or equal to Z.')
+        if A < 0 or Z < 0:
+            raise ValueError('A and Z must be greater than or equal to 0.')
         
-        return self.threshold[ring][(A,Z)]
-
-
-class MultiplicityMapping:
-    def __init__(self, path=None, reaction='Ca48Ni64E140'):
-        if path is None:
-            path = pathlib.Path(DATABASE, f'e15190/microball/bimp_mapping/{reaction}.dat')
-        
-        self.df = pd.read_csv(str(path), delim_whitespace=True).reset_index(drop=True)
+        query = self.threshold[ring].query('A == @A and Z == @Z')
+        if len(query) == 0:
+            raise ValueError('Not found the specified target.')
+        if len(query) > 1:
+            warnings.warn('Found more than one target. Use the first one.')
+        return query['threshold'].values[0]
     
-    def MultiplicityToImpactParameter(self, m=5, y:Literal['b', 'bhat']='b'):
-        df = self.df.loc[self.df['multiplicity']==m]
-        return (df[y].values[0], df[f'{y}_err'].values[0])
-
-    def plot_impact_parameter_mapping(self, ax=None, y:Literal['b', 'bhat']='b', **kwargs):
-        if ax is None:
-            ax = plt.gca()
-            
-        kw = dict(
-            fmt = 'k--.',
-        )
-        kw.update(kwargs)
-        return ax.errorbar(self.df['multiplicity'], self.df[y], yerr=self.df[f'{y}_err'], **kw)
+if __name__ == '__main__':
+    mb = microball()
+    mb.configurate()
+    mb.set_threshold(2, path=pathlib.Path(DATABASE, 'e15190/microball/acceptance/threshold_Sn_65mgcm2.dat'))
