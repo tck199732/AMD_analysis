@@ -46,11 +46,11 @@ void particle::initialize(const double &betacms)
     // uball coordinate phi=[-18,342]
     if (this->phi < -18.)
     {
-        this->phi += 342.;
+        this->phi += 360.;
     }
     if (this->phi > 342)
     {
-        this->phi -= 342.;
+        this->phi -= 360.;
     }
 }
 
