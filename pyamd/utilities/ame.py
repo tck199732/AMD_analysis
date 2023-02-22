@@ -24,9 +24,9 @@ class AME:
         with open(str(dl_path), 'w') as file:
             file.write(r.text)
 
-        self.read()
+        self._read()
 
-    def read(self):
+    def _read(self):
         with open(str(self.dl_path), 'r') as file:
             lines = file.readlines()
 
@@ -87,7 +87,6 @@ class AME:
         # df['mass'] = df['mass'] * constants.u
         # df['mass'] = list(
         # map(lambda m: (m * units.kg * constants.c**2).to('MeV').value, df['mass']))
-        # print(df)
         self.df = df
 
     def get_NZ(self, symbol):
@@ -115,3 +114,8 @@ class AME:
     def get_symbol(self, N, Z):
         row = self.df.loc[((self.df['N'] == N) & (self.df['Z'] == Z))]
         return row['symbol'].values[0]
+    
+    def is_physical(self, N, Z):
+        """ Check if the nucleus is in the AME table. """
+        row = self.df.loc[((self.df['N'] == N) & (self.df['Z'] == Z))]
+        return not row.empty
