@@ -44,7 +44,7 @@ void particle::initialize(const double &betacms)
     this->phi = TMath::ATan2(this->py, this->px) * TMath::RadToDeg();
 
     // uball coordinate phi=[-18,342]
-    if (this->phi < 0)
+    if (this->phi < -18.)
     {
         this->phi += 342.;
     }
