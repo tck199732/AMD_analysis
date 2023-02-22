@@ -43,13 +43,14 @@ void particle::initialize(const double &betacms)
     this->kinergy_lab = TMath::Sqrt(pow(pmag_lab, 2.) + pow(mass, 2.)) - mass;
     this->phi = TMath::ATan2(this->py, this->px) * TMath::RadToDeg();
 
+    // uball coordinate phi=[-18,342]
     if (this->phi < 0)
     {
-        this->phi += 360.;
+        this->phi += 342.;
     }
-    if (this->phi > 360)
+    if (this->phi > 342)
     {
-        this->phi -= 360.;
+        this->phi -= 342.;
     }
 }
 
