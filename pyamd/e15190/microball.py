@@ -2,19 +2,16 @@ import pathlib
 import warnings
 import numpy as np
 import pandas as pd
-import matplotlib as mpl
-import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit
 
 from pyamd import DATABASE
-from pyamd.utilities import style
-style.set_matplotlib_style(mpl)
+from pyamd.utilities import ame
+ame_table = ame.AME()
 
 class microball:
     """ A class to handle the geometry and acceptance (in MeV for each ring) of the microball detector.
     """
     MAX_A = 100
-    MAX_Z = 100
     def __init__(self, path=None, coordinate='uball'):
         """
         Parameters
@@ -30,19 +27,48 @@ class microball:
         
         self.coordinate = coordinate
         self.geometry = self._read_geometry(path, coordinate)
-        self.configuration = dict()
+
+        # a dictionary of dataframe to store the acceptance threshold for each ring
         self.threshold = dict()
 
-        self.configurated = False
-    
+    def configurate(self, path=None, reaction='Ca48Ni64E140'):
+        """ Configuare the `ring`and `det` used in the experiment.
+        Parameters
+        ----------
+        path : str
+            Path to the configuration file. The file has the following format: `system`, `ring` and a list of `det` separated by space.
+        reaction : str
+            Reaction name, e.g. `Ca48Ni64E140`
+        """
+        if path is None:
+            path = pathlib.Path(DATABASE, 'e15190/microball/acceptance/config.dat')
+
+        self.configuration = dict()
+        with open(str(path), 'r') as f:
+            content = f.readlines()
+            for line in content[1:]:
+                if not reaction == line.split()[0]:
+                    continue
+                ring = line.split()[1]
+                dets = list(map(int, line.split()[2:]))
+                self.configuration[ring] = dets
+        return self.configuration
+
     def _read_geometry(self, path, coordinate):
-        """ Base geometry of microball.  
-        Parameter
-        ---------
+        """ Read the geometry file.
+        Parameters
+        ----------
+        path : str
+            Path to the geometry file, the file contains the following columns: `ring, det, theta_min, theta_max, phi_min and phi_max`
         coordinate : str
             'uball' : default
-            'hira' : rotate :math: `\phi` angle by 90 degrees.
+            'hira' : rotate :math: `\phi` angle by 90 degrees.  
+        Returns
+        -------
+        df : pandas.DataFrame
+            A pandas DataFrame contains the geometry information.
         """
+
         df = pd.read_csv(str(path), delim_whitespace=True).set_index(['ring', 'det'])
         if coordinate.lower() == 'hira':
             df['phi_min'] += 90.
@@ -55,6 +81,11 @@ class microball:
             if row['phi_max'] > 360:
                 df.at[i, 'phi_max'] -= 360
 
+        for ring, dets in self.configuration.items():
+            DET_MAX = 14
+            for det in [det for det in range(1, DET_MAX + 1) if not det in dets]:
+                if (ring, det) in df.index:
+                    df.drop((ring, det))
         return df
     
     def get_theta_range(self, ring, det):
@@ -63,78 +94,15 @@ class microball:
     def get_phi_range(self, ring, det):
         return self.geometry.loc[ring, det]['phi_min'], self.geometry.loc[ring, det]['phi_max']
     
-    def configurate(self, path=None, reaction='Ca48Ni64E140'):
-        """ configurate according to the `ring` and `det` used in the experiment.
-        Parameters
-        ----------
-        path : str
-            Path to the configuration file. The file has the following format: `system`, `ring` and a list of `det` separated by space.
-        reaction : str
-            Reaction name, e.g. `Ca48Ni64E140`
-        """
-        if path is None:
-            path = pathlib.Path(DATABASE, 'e15190/microball/acceptance/config.dat')
-        with open(str(path), 'r') as f:
-            content = f.readlines()
-            for line in content[1:]:
-                if not reaction == line.split()[0]:
-                    continue
+    def get_ring(self, theta):
+        """ Get the ring number from `self.geometry` given theta. """
+        return self.geometry.query('theta_min <= @theta < theta_max').index.get_level_values('ring').values[0]
+    def get_ring_and_detectorID(self, theta, phi):
+        """ Get the ring number and detector ID from `self.geometry` given theta and phi. """
+        return self.geometry.query('theta_min <= @theta < theta_max and phi_min <= @phi < phi_max').index.values[0]
 
-                ring = line.split()[1]
-                dets = list(map(int, line.split()[2:]))
-                self.configuration[ring] = dets
-                DET_MAX = 14
-                for det in [det for det in range(1, DET_MAX + 1) if not det in dets]:
-                    if (ring, det) in self.geometry.index:
-                        self.geometry.drop((ring, det))
-        
-        self.configurated = True
-        return self.geometry
 
-    def plot_coverage(self, cmap='viridis', **kwargs):
-        figdict = dict(
-            figsize = (6,4),
-        )
-        figdict.update(kwargs)
-        
-        fig, ax = plt.subplots(**figdict)
-        cm = plt.get_cmap(cmap)(np.linspace(0.3, 1, len(self.geometry)))
-
-        for ir, (index, row) in enumerate(self.geometry.iterrows()):
-            ring, det = index
-            x = row['phi_min']
-            y = row['theta_min']
-            dx = row['phi_max'] - x 
-            dy = row['theta_max'] - y
-            patch = plt.Rectangle(
-                (x, y), dx, dy, 
-                fill=True, alpha=0.6, edgecolor='k',
-                facecolor=cm[ir], linewidth=1
-            )
-            ax.add_patch(patch)
-            ax.text(
-                x + 0.5 * dx, 
-                y + 0.5 * dy, f'{ring}:{det}',
-                ha='center', va='center', 
-                fontdict={
-                    'size': 8, 
-                    'weight': 'roman', 
-                    'family' : 'serif', 
-                    'style' : 'normal',
-                } 
-            )
-
-        ax.set(title=r'E15190 $\mu$-ball coverage')
-        ax.set(xlabel=r'$\phi$ (deg.)', ylabel=r'$\theta$ (deg.)')
-        if self.coordinate == 'uball':
-            ax.set(xlim=(-30,360), ylim=(0,160))
-        elif self.coordinate == 'hira':
-            ax.set(xlim=(0,360), ylim=(0,160))
-
-        plt.tight_layout()
-        return fig, ax
-
-    def set_threshold(self, ring=2, path=None, maxA=None, maxZ=None):
+    def set_threshold(self, ring=2, path=None, maxA=None):
         """ Set the threshold energy (MeV) for the specified ring according to the threshold file. In the file, the first column is the `A` of the target, the second column is the `Z` of the target, and the third column is the threshold energy (MeV). If the `A` and `Z` of the target are not found in the file, the threshold energy will be interpolated from the nearest `A` and `Z` values. 
         Parameters
         ----------
@@ -162,15 +130,23 @@ class microball:
         df.columns = ['A', 'Z', 'kinergy_MeV']
 
         maxA = self.MAX_A if maxA is None else maxA
-        maxZ = self.MAX_Z if maxZ is None else maxZ
-
-        for Z, subdf in df.groupby('Z'):
-            a = subdf['A'].to_numpy()
-            e = subdf['kinergy_MeV'].to_numpy()
-            # interpolate and extrapolate the threshold energy
+        A = np.arange(1, maxA+1)
+        # f = lambda x, a, b, c: a * x ** 2 + b * x + c
+        f = lambda x, a, b: a * x + b
         
+        threshold = dict()
+        for Z, subdf in df.groupby('Z'):
+            x = subdf['A'].to_numpy()
+            y = subdf['kinergy_MeV'].to_numpy()
 
-        # setting self.thereshld[ring] = df
+            popt, _ = curve_fit(f, x, y)
+            missing_A = np.array([a for a in A if not a in x and ame_table.is_physical(a-Z, Z)])
+            threshold[Z] = pd.concat([subdf, pd.DataFrame({
+                'A': missing_A,
+                'Z': Z,
+                'kinergy_MeV': f(missing_A, *popt)
+            })])
+        self.threshold[ring] = pd.concat(threshold.values())
 
     def get_threshold(self, ring, A, Z):
         if not ring in self.threshold:
@@ -185,9 +161,16 @@ class microball:
             raise ValueError('Not found the specified target.')
         if len(query) > 1:
             warnings.warn('Found more than one target. Use the first one.')
-        return query['threshold'].values[0]
+        return query['kinergy_MeV'].values[0]
     
-if __name__ == '__main__':
-    mb = microball()
-    mb.configurate()
-    mb.set_threshold(2, path=pathlib.Path(DATABASE, 'e15190/microball/acceptance/threshold_Sn_65mgcm2.dat'))
+    def is_inside(self, theta, phi):
+        """ Check if the specified theta and phi are inside the microball. """
+        return self.get_ring_and_detectorID(theta, phi) is not None
+
+    def is_punchthrough(self, ring, A, Z, E):
+        """ Check if the specified energy is detected by the specified ring. """
+        return E >= self.get_threshold(ring, A, Z)
+
+    def is_detected(self, ring, A, Z, E, theta, phi):
+        """ Check if the particle is detected by microball. """
+        return self.is_inside(theta, phi) and self.is_punchthrough(ring, A, Z, E)
