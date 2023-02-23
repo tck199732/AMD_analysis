@@ -1,5 +1,6 @@
 import pathlib
 import warnings
+import inspect
 import numpy as np
 import pandas as pd
 from scipy.optimize import curve_fit
@@ -52,8 +53,15 @@ class microball:
                 ring = line.split()[1]
                 dets = list(map(int, line.split()[2:]))
                 self.configuration[ring] = dets
-        return self.configuration
 
+        for ring, dets in self.configuration.items():
+            DET_MAX = 14
+            for det in [det for det in range(1, DET_MAX + 1) if not det in dets]:
+                if (ring, det) in self.geometry.index:
+                    self.geometry.drop((ring, det))
+
+        return
+    
     def _read_geometry(self, path, coordinate):
         """ Read the geometry file.
         Parameters
@@ -81,11 +89,6 @@ class microball:
             if row['phi_max'] > 360:
                 df.at[i, 'phi_max'] -= 360
 
-        for ring, dets in self.configuration.items():
-            DET_MAX = 14
-            for det in [det for det in range(1, DET_MAX + 1) if not det in dets]:
-                if (ring, det) in df.index:
-                    df.drop((ring, det))
         return df
     
     def get_theta_range(self, ring, det):
@@ -171,6 +174,68 @@ class microball:
         """ Check if the specified energy is detected by the specified ring. """
         return E >= self.get_threshold(ring, A, Z)
 
-    def is_detected(self, ring, A, Z, E, theta, phi):
+    def is_detected(self, A, Z, E, theta, phi):
         """ Check if the particle is detected by microball. """
+        ring = self.get_ring(theta)
         return self.is_inside(theta, phi) and self.is_punchthrough(ring, A, Z, E)
+    
+    def is_inside_cpp(self, theta_br='theta_deg', phi_br='phi_deg', fcn_name='is_inside'):
+        """ Construct a cpp function code snipet to be fed to `ROOT.RDataFrame.Define`
+        """
+        conditions = ' ||\n'.join([inspect.cleandoc(f'''
+        (theta >= {row['theta_min']} && theta < {row['theta_max']} && phi >= {row['phi_min']} && phi < {row['phi_max']})''') for _, row in self.geometry.iterrows()])
+
+        script = inspect.cleandoc(f''' 
+            ROOT::RVec<bool> {fcn_name}(const ROOT::RVec<double>& {theta_br}, const ROOT::RVec<double>& {phi_br}) {{
+                ROOT::RVec<bool> result;
+                int n = {theta_br}.size();
+
+                for (int i = 0; i < n; i++) {{
+                    double theta = {theta_br}[i];
+                    double phi = {phi_br}[i];
+                    result.push_back({conditions});
+                }}
+                return result;
+            }}
+        ''')
+        return script
+    
+    def get_ring_cpp(self, theta_br='theta_deg', fcn_name='get_ring'):
+
+        df = self.geometry.reset_index()[['ring', 'theta_min', 'theta_max']].drop_duplicates().reset_index(drop=True)
+
+        mapping = {
+            row['ring'] : (row['theta_min'], row['theta_max']) for _, row in df.iterrows()
+        }
+        
+        if_else_statement = ''
+        for i, (key, value) in enumerate(mapping.items()):
+            if i == 0:
+                if_else_statement = f'''
+                    if (theta >= {value[0]} && theta < {value[1]}) {{
+                        ring = {key};
+                    }}
+                '''
+            else:
+                if_else_statement += f'''
+                    else if (theta >= {value[0]} && theta < {value[1]}) {{
+                        ring = {key};
+                    }}
+                '''
+        script = f'''
+            ROOT::RVec<int> {fcn_name}(const ROOT::RVec<double>& {theta_br}) {{
+                ROOT::RVec<int> result;
+                int n = {theta_br}.size();
+                for (int i = 0; i < n; i++) {{
+                    int ring = -1;
+                    double theta = {theta_br}[i];
+                    {if_else_statement}
+                    result.push_back(ring);
+                }}
+                return result;
+            }}
+        '''
+        return script
+    
+    def is_punchthrough_cpp(self, ring_br='ring', A_br='A', Z_br='Z', E_br='kinergy', fcn_name='is_punchthrough'):
+        pass
