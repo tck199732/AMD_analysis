@@ -320,7 +320,7 @@ bool Microball::IsAccepted(const double &ekinlab, const double &thetalab, const 
         return true;
     }
     int ring_id = this->GetRingID(thetalab);
-    return (ring_id != -1 && aid <= this->MaxA && zid <= this->MaxZ) ? ekinlab >= this->KinergyThreshold[ring_id][aid][zid] / (double)aid : false;
+    return (ring_id != -1 && aid <= this->MaxA && zid <= this->MaxZ) ? ekinlab >= this->KinergyThreshold[ring_id][aid][zid] : false;
 }
 
 bool Microball::IsReadyCsI(const double &thetalab, const double &phi)
