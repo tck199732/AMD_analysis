@@ -81,7 +81,7 @@ class Expr:
     @staticmethod
     def kinergy(pmag_name, mass_name):
         return f'sqrt(pow({pmag_name}, 2.) + pow({mass_name}, 2.)) - {mass_name}'
-
+    
     @staticmethod
     def rapidity(kinergy_name, pz_name, mass_name):
         return f'0.5 * log( ({kinergy_name} + {pz_name} + {mass_name}) / ({kinergy_name} - {pz_name} + {mass_name}) )'
@@ -210,15 +210,13 @@ class RDataFrame_AMD:
         }
         return self._define_template(rules, inplace=inplace)
 
-    def define_phi_deg(self, br_name='phi_deg', px_name='px', py_name='py', forced=True, inplace=True):
+    def define_phi_deg(self, br_name='phi_deg', px_name='px', py_name='py', inplace=True):
+        """ Define the phi angle in degree, frame is irrelevant. Here the range of theta is [-180, 180], shift to the desired range manually. 
+        """
         rules = {
             br_name: Expr.phi_deg(px_name, py_name)
         }
-        update_rules = {
-            br_name: f'{br_name} > 0. ? {br_name} : {br_name} + 360.',
-        }
-        rules.update(update_rules)
-        return self._define_template(rules, forced=forced, inplace=inplace)
+        self._define_template(rules, inplace=inplace)
 
     def define_pz_lab(self, br_name='pz_lab', pz_name='pz', kinergy_name='kinergy', mass_name='mass', beta=None, inplace=True):
         if beta is None:
