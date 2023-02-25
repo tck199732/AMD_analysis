@@ -237,5 +237,76 @@ class microball:
         '''
         return script
     
+
+    def get_CsI_cpp(self, theta_br='thete_deg', phi_br='phi_deg', fcn_name='get_CsI'):
+        df = self.geometry.reset_index()
+        detector_id = [f"""{{ 
+           {{ {row['theta_min']}, {row['theta_max']}, {row['phi_min']}, {row['phi_max']} }}, {{ {row['ring']:.0f}, {row['det']:.0f} }}
+        }}""" for _, row in df.iterrows()]
+        
+        detector_id = ',\n'.join(list(map(inspect.cleandoc, detector_id)))
+        
+
+        script = f'''
+            std::map<std::tuple<double, double, double, double>, std::tuple<int, int>> detector_id = {{
+                {detector_id}
+            }};
+
+            ROOT::RVec<int> {fcn_name}(const ROOT::RVec<double>& {theta_br}, const ROOT::RVec<double>& {phi_br}) {{
+                ROOT::RVec<int> result;
+                int n = {theta_br}.size();
+                for (int i = 0; i < n; i++) {{
+                    int ring = -1;
+                    int det = -1;
+                    double theta = {theta_br}[i];
+                    double phi = {phi_br}[i];
+                    for (auto& [key, value] : detector_id) {{
+                        auto [theta_min, theta_max, phi_min, phi_max] = key;
+                        if (theta >= theta_min && theta < theta_max && phi >= phi_min && phi < phi_max) {{
+                            std::tie(ring, det) = value;
+                            break;
+                        }}
+                    }}
+                    result.push_back(det);
+                }}  
+                return result;
+            }}
+        '''
+        return script
+
+
+    def get_threshold_data_cpp(self):
+
+        df = self.threshold
+        for r, subdf in df.items():
+            subdf['ring'] = r
+        df = pd.concat([subdf for subdf in self.threshold.values()])
+
+        # construct a cpp map for the threshold data
+        return ',\n'.join([inspect.cleandoc(f"""
+            {{ {{ {row['ring']:.0f}, {row['A']:.0f}, {row['Z']:.0f}  }}, {row['kinergy_MeV']} }}
+        """) for _, row in df.iterrows()])
+        
     def is_punchthrough_cpp(self, ring_br='ring', A_br='A', Z_br='Z', E_br='kinergy', fcn_name='is_punchthrough'):
-        pass
+        threshold_data = self.get_threshold_data_cpp()
+        script = f'''
+            std::map<std::tuple<int, int, int>, double> threshold_map = {{
+                {threshold_data}
+            }};
+            ROOT::RVec<bool> {fcn_name}(const ROOT::RVec<int>& {ring_br}, const ROOT::RVec<int>& {A_br}, const ROOT::RVec<int>& {Z_br}, const ROOT::RVec<double>& {E_br}) {{
+                ROOT::RVec<bool> result;
+                int n = {ring_br}.size();
+                for (int i = 0; i < n; i++) {{
+                    int r = {ring_br}[i];
+                    int a = {A_br}[i];
+                    int z = {Z_br}[i];
+                    double e = {E_br}[i];
+                    
+                    bool is_punchthr = threshold_map.count({{r, a, z}}) > 0  && e >= threshold_map[{{r, a, z}}];
+                    result.push_back(is_punchthr);
+                }}
+                return result;
+            }}
+        '''
+        return script
+            
