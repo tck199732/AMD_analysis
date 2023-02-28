@@ -67,7 +67,6 @@ class AME:
         lines = [freader.read(line) for line in lines]
         for i, line in enumerate(lines):
             lines[i] = [line[id] for id in columns_names]
-            # print(lines[i])
 
         df = pd.DataFrame(lines, columns=columns_names.values())
         df['N'] = df['N'].astype(int)
@@ -76,17 +75,12 @@ class AME:
 
         df['symbol'] = list(map(lambda s: s.lower().strip(), df['symbol']))
         df['symbol'] = df['symbol'] + df['A'].astype(str)
-        # df['symbol'] = list(map(lambda s: s.lower*(), df['symbol']))
 
         df['atomic_mass'] = df['A'] + \
             df['atomic_mass'] * units.micron.to('m', 1.)
         df['atomic_mass_err'] = df['atomic_mass_err'] * \
             units.micron.to('m', 1.)
 
-        # df['mass'] = df['A'] + df['atomic_mass'] * units.micron.to(units.m, 1.)
-        # df['mass'] = df['mass'] * constants.u
-        # df['mass'] = list(
-        # map(lambda m: (m * units.kg * constants.c**2).to('MeV').value, df['mass']))
         self.df = df
 
     def get_NZ(self, symbol):
@@ -105,8 +99,6 @@ class AME:
             elif N is None or Z is None:
                 raise ValueError('please provide N and Z.')
 
-        # atomic_mass = row['atomic_mass'].values[0]
-        # return (atomic_mass * constants.u * constants.c**2).to('MeV')
         mass_excess = row['mass_excess'].values[0]
         A = row['A'].values[0]
         return (A * constants.u * constants.c**2 + mass_excess * units.keV).to('MeV')
@@ -119,3 +111,15 @@ class AME:
         """ Check if the nucleus is in the AME table. """
         row = self.df.loc[((self.df['N'] == N) & (self.df['Z'] == Z))]
         return not row.empty
+
+    def get_mass_data(self, fname='ame_mass.txt'):
+        """ Output mass data to a text file """
+        df = self.df[['Z', 'A', 'mass_excess']].copy()
+
+        df['mass_excess'] = df['mass_excess'] * (units.keV.to('MeV'))
+        
+        df['mass'] = df['A'] * (constants.u * constants.c**2).to('MeV') + df['mass_excess']
+
+        df.to_csv(fname, sep=' ', columns=['Z', 'A', 'mass'], index=False)
+
+        return df
