@@ -309,3 +309,39 @@ class HistogramReader:
 
         if isinstance(histo, uproot.behaviors.TH3.TH3):
             return self._uproot_TH3D_to_df(histo, xname, yname, zname, wname, ename, keep_zeros)
+
+    def projection(self, hist, name=None, axis:Literal['x','y']='x', range=(0, 1e10)):
+        """ Project a 2D histogram to 1D
+        Parameters
+        ----------
+        hist : ROOT.TH2D or uproot.behaviors.TH2.TH2
+        name : str
+            name of the projected histogram
+        axis : str
+            `x` or `y`
+        range : tuple
+            range of the projection
+        Returns
+        -------
+        ROOT.TH1D or uproot.behaviors.TH1.TH1
+        Example
+        -------
+        # for ROOT.TH2D
+        h2 = ROOT.TH2D('test', '', 100, -1., 1., 100, -1., 1.)
+        for _ in range(100):
+            h2.Fill(ROOT.gRandom.Gaus(0.), ROOT.gRandom.Gaus(0.5))
+        h1 = hist_reader.projection(h2, name='h1', axis='x', range=(-0.5, 0.5))
+        """
+        axes = ['x', 'y']
+        if axis.lower() not in axes:
+            raise ValueError(f'axis must be either `x` or `y`, not {axis}')
+        
+        if name is None:
+            name = hist.GetName() + f'_p{axis}'
+
+        a = axes[1 - axes.index(axis.lower())]
+        GetAxis = getattr(hist, f"Get{a.upper()}axis")
+        xbin1 = GetAxis().FindBin(range[0])
+        xbin2 = GetAxis().FindBin(range[1])
+
+        return getattr(hist, f'Projection{axis.upper()}')(name, xbin1, xbin2)
