@@ -31,7 +31,7 @@ protected:
         {{4, 2}, "4He"},
     };
     std::array<double, 2> THETACUT = {30., 75.};
-    std::array<double, 2> PHICUT = {0, 360};
+    std::array<double, 2> PHICUT = {-360, 360};
 
 public:
     HiRA();
