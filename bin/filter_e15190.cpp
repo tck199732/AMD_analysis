@@ -127,6 +127,7 @@ int main(int argc, char *argv[])
         {
             particle particle = {amd.N[i], amd.Z[i], amd.px[i], amd.py[i], amd.pz[i]};
             particle.initialize(betacms);
+            // phi is calculated according to microball detector, if the particle is not covered by microball, phi is not correct and should be in the range of [-pi, pi].
             correct_phi_value(particle, microball);
 
             int uball_multi = microball->GetCsIHits();
@@ -150,7 +151,6 @@ int main(int argc, char *argv[])
                 filtered_amd.hira_px[hira_multi] = particle.px;
                 filtered_amd.hira_py[hira_multi] = particle.py;
                 filtered_amd.hira_pz[hira_multi] = particle.pz_lab;
-
                 hira->CountPass();
             }
         }
@@ -158,6 +158,7 @@ int main(int argc, char *argv[])
         filtered_amd.hira_multi = hira->GetCountPass();
         filtered_amd.uball_multi = microball->GetCsIHits();
         filtered_amd.b = amd.b;
+        // if microball multi is 0, in experiment we don't see the event. We still keep the event here as this data can be easily removed in the analysis.
         tree->Fill();
     }
 
