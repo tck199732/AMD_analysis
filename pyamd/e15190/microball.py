@@ -286,7 +286,16 @@ class microball:
         return ',\n'.join([inspect.cleandoc(f"""
             {{ {{ {row['ring']:.0f}, {row['A']:.0f}, {row['Z']:.0f}  }}, {row['kinergy_MeV']} }}
         """) for _, row in df.iterrows()])
+
+    def generate_threshold_data(self, fname='threshold_data.dat'):
+        df = self.threshold
+        for r, subdf in df.items():
+            subdf['ring'] = r
+        df = pd.concat([subdf for subdf in self.threshold.values()])
         
+        df.to_csv(fname, columns=['ring', 'A', 'Z', 'kinergy_MeV'], index=False, sep=' ')
+        return
+
     def is_punchthrough_cpp(self, ring_br='ring', A_br='A', Z_br='Z', E_br='kinergy', fcn_name='is_punchthrough'):
         threshold_data = self.get_threshold_data_cpp()
         script = f'''
@@ -309,4 +318,20 @@ class microball:
             }}
         '''
         return script
-            
+
+if __name__ == '__main__':
+    mb = microball()
+    mb.configurate(reaction='Ca48Ni64E140')
+    # setting up the threshold data for microball
+    threshold_map = {
+        2: 'threshold_Sn_65mgcm2.dat',
+        3: 'threshold_Sn_58mgcm2.dat',
+        4: 'threshold_Sn_50mgcm2.dat',
+        5: 'threshold_Sn_43mgcm2.dat',
+        7: 'threshold_Sn_30mgcm2.dat',
+        8: 'threshold_Sn_23mgcm2.dat',
+    }
+    for ring, filename in threshold_map.items():
+        mb.set_threshold(ring, pathlib.Path(DATABASE, 'e15190/microball/acceptance') / filename)
+
+    mb.generate_threshold_data()
