@@ -1,0 +1,10 @@
+
+# executables
+*.exe
+
+# root file
+*.root
+
+# bash scripts
+*.sh
+
