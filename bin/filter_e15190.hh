@@ -5,6 +5,7 @@
 #include "TChain.h"
 #include "TFile.h"
 #include "TTree.h"
+#include "TString.h"
 
 #include <map>
 #include <vector>
@@ -107,6 +108,10 @@ void correct_phi_value(particle &part, Microball *&microball)
     }
 }
 
+void ParsingListFile(const std::string &list_file, std::vector<std::string> &input_files)
+{
+}
+
 class ArgumentParser
 {
 public:
@@ -117,6 +122,10 @@ public:
 
     ArgumentParser(int argc, char *argv[])
     {
+        reaction = "";
+        input_files = {};
+        output_file = "";
+
         options = {
             {"help", no_argument, 0, 'h'},
             {"reaction", required_argument, 0, 'r'},
@@ -139,19 +148,10 @@ public:
             }
             case 'i':
             {
-                std::string files = optarg;
-                std::string delimiter = " ";
-                size_t pos = 0;
-                std::string token;
-                while ((pos = files.find(delimiter)) != std::string::npos)
+                this->input_files.push_back(optarg);
+                while (optind < argc && *argv[optind] != '-')
                 {
-                    token = files.substr(0, pos);
-                    this->input_files.push_back(token);
-                    files.erase(0, pos + delimiter.length());
-                }
-                if (files.length() > 0)
-                {
-                    this->input_files.push_back(files);
+                    this->input_files.push_back(argv[optind++]);
                 }
                 break;
             }
@@ -176,6 +176,31 @@ public:
             }
             }
         }
+
+        if (this->reaction.empty())
+        {
+            std::cout << "Reaction tag is required." << std::endl;
+            this->help();
+        }
+        if (this->input_files.empty())
+        {
+            std::cout << "Input files are required." << std::endl;
+            this->help();
+        }
+        if (this->output_file.empty())
+        {
+            std::cout << "Output file is required." << std::endl;
+            this->help();
+        }
+        for (auto pth : this->input_files)
+        {
+            if (!fs::exists(pth))
+            {
+                std::cout << "Input file " << pth << " does not exist." << std::endl;
+                this->help();
+            }
+            std::cout << "Input file: " << pth << std::endl;
+        }
     }
     void help()
     {
@@ -190,4 +215,35 @@ public:
 
 protected:
     std::vector<option> options;
+};
+
+class ProgressBar
+{
+public:
+    int njobs;
+    int njobs_done;
+    std::string progress_name;
+    ProgressBar(const int &njobs, const std::string &name = "Progress")
+    {
+        this->progress_name = name;
+        this->njobs = njobs;
+        this->njobs_done = 0;
+    }
+    void Update()
+    {
+        if (this->njobs_done == this->njobs)
+        {
+            return;
+        }
+        this->njobs_done++;
+
+        if (this->njobs_done % (this->njobs / 100) == 0)
+        {
+            double progress = (double)njobs_done / njobs;
+            int barWidth = 70;
+            std::cout << Form("%14s: [", this->progress_name.c_str());
+            std::cout << std::string(barWidth * progress, '=') << std::string(barWidth * (1 - progress), ' ') << "] " << int(progress * 100.0) << "%\r";
+            std::cout << std::flush;
+        }
+    }
 };
