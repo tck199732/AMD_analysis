@@ -26,10 +26,10 @@ public:
     ~Microball(){};
 
     // option control
-    void TurnOff_ChargedParticle() { this->Is_apply_cut_charged_particle = 0; }
-    void TurnOff_MultipleHitCorrection() { this->Is_apply_cut_multiple_hit = 0; }
-    void TurnOff_KinergyCorrection() { this->Is_apply_cut_kinergy = 0; }
-    void TurnOff_CoverageCorrection() { this->Is_apply_cut_coverage = 0; }
+    void Set_Is_apply_cut_charged_particle(bool flag) { this->Is_apply_cut_charged_particle = flag; }
+    void Set_Is_apply_cut_multiple_hit(bool flag) { this->Is_apply_cut_multiple_hit = flag; }
+    void Set_Is_apply_cut_kinergy(bool flag) { this->Is_apply_cut_kinergy = flag; }
+    void Set_Is_apply_cut_coverage(bool flag) { this->Is_apply_cut_coverage = flag; }
 
     bool Get_Is_apply_cut_charged_particle() { return this->Is_apply_cut_charged_particle; }
     bool Get_Is_apply_cut_multiple_hit() { return this->Is_apply_cut_multiple_hit; }
