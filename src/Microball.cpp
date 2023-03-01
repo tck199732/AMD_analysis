@@ -2,33 +2,13 @@
 
 Microball::Microball()
 {
-    OptionChargedParticle = 1;
-    OptionMultipleHit = 1;
-    OptionKinergy = 1;
-    OptinoCoverage = 1;
-
-    for (int ring = 0; ring < this->NumRing; ring++)
-    {
-        for (int det = 0; det < this->NumDet; det++)
-        {
-            this->Theta[ring][det][0] = -1;
-            this->Phi[ring][det][0] = -1;
-            this->Theta[ring][det][1] = -1;
-            this->Phi[ring][det][1] = -1;
-            this->CsIHits[ring][det] = 0;
-        }
-
-        for (int aid = 0; aid < this->MaxA; aid++)
-        {
-            for (int zid = 0; zid < this->MaxA; zid++)
-            {
-                this->KinergyThreshold[ring][aid][zid] = 0.;
-            }
-        }
-    }
+    this->Is_apply_cut_charged_particle = 1;
+    this->Is_apply_cut_multiple_hit = 1;
+    this->Is_apply_cut_kinergy = 1;
+    this->Is_apply_cut_coverage = 1;
 }
 
-void Microball::ReadGeometry(const std::string &filename)
+void Microball::ReadGeometryMap(const std::string &filename)
 {
     if (!fs::exists(filename))
     {
@@ -43,23 +23,26 @@ void Microball::ReadGeometry(const std::string &filename)
     while (infile >> ring)
     {
         infile >> det >> theta1 >> theta2 >> phi1 >> phi2;
-
-        this->Theta[ring][det][0] = theta1;
-        this->Theta[ring][det][1] = theta2;
-        this->Phi[ring][det][0] = phi1;
-        this->Phi[ring][det][1] = phi2;
+        if (this->DetectorSetupMap.count(ring) == 1)
+        {
+            this->ThetaMap[ring] = {theta1, theta2};
+            if (std::find(this->DetectorSetupMap[ring].begin(), this->DetectorSetupMap[ring].end(), det) == this->DetectorSetupMap[ring].end())
+            {
+                continue;
+            }
+            this->PhiMap[{ring, det}] = {phi1, phi2};
+        }
     }
     infile.close();
 }
 
-void Microball::ReadConfiguration(const std::string &reaction, const std::string &filename)
+void Microball::ConfigurateSetup(const std::string &reaction, const std::string &filename)
 {
     if (!fs::exists(filename))
     {
         std::string msg = Form("file does not exist : %s", filename.c_str());
         throw std::invalid_argument(msg.c_str());
     }
-
     std::ifstream stream(filename.c_str());
     stream.ignore(99, '\n');
     std::string line;
@@ -74,48 +57,43 @@ void Microball::ReadConfiguration(const std::string &reaction, const std::string
             continue;
         }
 
-        std::vector<int> det_array;
+        this->DetectorSetupMap[ring_id] = std::vector<int>();
         while (iss >> det_id)
         {
-            det_array.push_back(det_id);
-        }
-
-        for (int det = 0; det < this->NumDet; det++)
-        {
-            if (std::find(det_array.begin(), det_array.end(), det) - det_array.begin() == det_array.size())
-            {
-                this->RemoveCsI(ring_id, det);
-            }
+            this->DetectorSetupMap[ring_id].push_back(det_id);
         }
     }
+    return;
 }
 
-void Microball::RemoveCsI(const int &ring, const int &det)
+void Microball::ReadThresholdKinergyMap(const std::string &filename)
 {
-    this->Theta[ring][det][0] = -1;
-    this->Phi[ring][det][0] = -1;
-    this->Theta[ring][det][1] = -1;
-    this->Phi[ring][det][1] = -1;
-    this->CsIHits[ring][det] = 0;
-}
-
-void Microball::ResetCsI()
-{
-    for (int i = 0; i < this->NumRing; i++)
+    if (!fs::exists(filename))
     {
-        for (int j = 0; j < this->NumDet; j++)
+        std::string msg = Form("file does not exist : %s", filename.c_str());
+        throw std::invalid_argument(msg.c_str());
+    }
+    std::ifstream infile(filename.c_str());
+    infile.ignore(99, '\n');
+
+    int ring, A, Z;
+    double kinergy_MeV;
+    while (infile >> ring)
+    {
+        if (this->DetectorSetupMap.count(ring) == 0)
         {
-            this->CsIHits[i][j] = 0;
+            continue;
         }
+        infile >> A >> Z >> kinergy_MeV;
+        if (A > this->MaxA || Z > this->MaxZ)
+        {
+            continue;
+        }
+        this->KinergyThresholdMap[{ring, A, Z}] = kinergy_MeV;
     }
 }
 
-/**
- * @brief Read threshold kinetic energy (data is in unit of MeV not MeV/A)
- *
- * @param ring
- * @param filename
- */
+/*
 void Microball::ReadThreshold(const int &ring, const std::string &filename)
 {
     if (!fs::exists(filename))
@@ -188,79 +166,37 @@ void Microball::ReadThreshold(const int &ring, const std::string &filename)
     infile.close();
     return;
 }
+*/
 
-void Microball::HiRA_Coordinate()
+std::pair<int, int> Microball::GetRingDetID(const double &thetalab, const double &phi)
 {
-    for (int ring = 0; ring < this->NumRing; ring++)
+    int ring_id = this->GetRingID(thetalab);
+    if (ring_id == -1)
     {
-        for (int det = 0; det < this->NumDet; det++)
-        {
-            if (this->Phi[ring][det][0] != -1. && this->Phi[ring][det][1] != -1. && this->Theta[ring][det][0] != -1. && this->Theta[ring][det][1] != -1.)
-            {
-                this->Phi[ring][det][0] += 90.;
-                this->Phi[ring][det][1] += 90.;
+        return {-1, -1};
+    }
 
-                if (this->Phi[ring][det][0] >= 360.)
-                {
-                    this->Phi[ring][det][0] -= 360.;
-                }
-                if (this->Phi[ring][det][1] > 360.)
-                {
-                    this->Phi[ring][det][1] -= 360.;
-                }
-                if (this->Phi[ring][det][0] < 0.)
-                {
-                    this->Phi[ring][det][0] += 360.;
-                }
-                if (this->Phi[ring][det][1] <= 0.)
-                {
-                    this->Phi[ring][det][1] += 360.;
-                }
-            }
+    for (const auto &[ring_det, phi_range] : this->PhiMap)
+    {
+        if (ring_det[0] != ring_id)
+        {
+            continue;
+        }
+        if (phi >= phi_range[0] && phi < phi_range[1])
+        {
+            return {ring_det[0], ring_det[1]};
         }
     }
-}
-
-void Microball::ResetPhiRange()
-{
-    for (int ring = 0; ring < this->NumRing; ring++)
-    {
-        for (int det = 0; det < this->NumDet; det++)
-        {
-
-            if (this->Phi[ring][det][0] != -1. && this->Phi[ring][det][1] != -1. && this->Theta[ring][det][0] != -1. && this->Theta[ring][det][1] != -1.)
-            {
-                if (this->Phi[ring][det][0] >= 360.)
-                {
-                    this->Phi[ring][det][0] -= 360.;
-                }
-                else if (this->Phi[ring][det][1] > 360.)
-                {
-                    this->Phi[ring][det][1] -= 360.;
-                }
-                else if (this->Phi[ring][det][0] < 0.)
-                {
-                    this->Phi[ring][det][0] += 360.;
-                }
-                else if (this->Phi[ring][det][1] <= 0.)
-                {
-                    this->Phi[ring][det][1] += 360.;
-                }
-            }
-        }
-    }
+    return {-1, -1};
 }
 
 int Microball::GetRingID(const double &thetalab)
 {
-    for (int ring = 0; ring < this->NumRing; ring++)
+    for (auto &[ring, theta_range] : this->ThetaMap)
     {
-        for (int det = 0; det < this->NumDet; det++)
+        if (thetalab >= theta_range[0] && thetalab < theta_range[1])
         {
-            if (thetalab >= this->Theta[ring][det][0] && thetalab <= this->Theta[ring][det][1])
-            {
-                return ring;
-            }
+            return ring;
         }
     }
     return -1;
@@ -268,66 +204,134 @@ int Microball::GetRingID(const double &thetalab)
 
 int Microball::GetDetID(const double &thetalab, const double &phi)
 {
-    int ring_id = this->GetRingID(thetalab);
-    if (ring_id == -1)
-    {
-        return -1;
-    }
-
-    for (int det = 0; det < this->NumDet; det++)
-    {
-
-        if (this->Phi[ring_id][det][0] < this->Phi[ring_id][det][1])
-        {
-            if (phi >= this->Phi[ring_id][det][0] && phi <= this->Phi[ring_id][det][1])
-            {
-                return det;
-            }
-        }
-        else if (this->Phi[ring_id][det][0] > this->Phi[ring_id][det][1])
-        {
-            if ((phi >= this->Phi[ring_id][det][0] && phi <= 360) || (phi >= 0.0 && phi <= this->Phi[ring_id][det][1]))
-            {
-                return det;
-            }
-        }
-    }
-    return -1;
+    return GetRingDetID(thetalab, phi).second;
 }
 
-double Microball::GetThreshold(const double &thetalab, const int &aid, const int &zid)
+double Microball::GetPhiMinInRing(const int &ring)
+{
+    double phi_min = DBL_MAX;
+    for (const auto &[ring_det, phi_range] : this->PhiMap)
+    {
+        if (ring_det[0] == ring && phi_range[0] < phi_min)
+        {
+            phi_min = phi_range[0];
+        }
+    }
+    return phi_min;
+}
+
+double Microball::GetPhiMaxInRing(const int &ring)
+{
+    double phi_max = DBL_MIN;
+    for (const auto &[ring_det, phi_range] : this->PhiMap)
+    {
+        if (ring_det[0] == ring && phi_range[1] > phi_max)
+        {
+            phi_max = phi_range[1];
+        }
+    }
+    return phi_max;
+}
+
+double Microball::GetThresholdKinergy(const int &ring_id, const int &aid, const int &zid)
+{
+    if (this->DetectorSetupMap.count(ring_id) == 0)
+    {
+        return DBL_MAX;
+    }
+    return this->KinergyThresholdMap[{ring_id, aid, zid}];
+}
+double Microball::GetThresholdKinergy(const double &thetalab, const int &aid, const int &zid)
 {
     int ring_id = this->GetRingID(thetalab);
-    return this->GetThreshold(ring_id, aid, zid);
+    return this->GetThresholdKinergy(ring_id, aid, zid);
 }
 
 bool Microball::IsChargedParticle(const int &Z)
 {
-    return (Z > 0 || !OptionChargedParticle) ? 1 : 0;
+    if (!this->Is_apply_cut_charged_particle)
+    {
+        return true;
+    }
+    return Z > 0;
 }
 
 bool Microball::IsCovered(const double &thetalab, const double &phi)
 {
-    int ring_id = this->GetRingID(thetalab);
-    int det_id = this->GetDetID(thetalab, phi);
-    return (ring_id != -1 && det_id != -1) || !this->OptinoCoverage;
-}
-
-bool Microball::IsAccepted(const double &ekinlab, const double &thetalab, const int &aid, const int &zid)
-{
-    if (!this->OptionKinergy)
+    if (!this->Is_apply_cut_coverage)
     {
         return true;
     }
     int ring_id = this->GetRingID(thetalab);
-    return (ring_id != -1 && aid <= this->MaxA && zid <= this->MaxZ) ? ekinlab >= this->KinergyThreshold[ring_id][aid][zid] : false;
+    int det_id = this->GetDetID(thetalab, phi);
+    return (ring_id != -1 && det_id != -1);
 }
 
-bool Microball::IsReadyCsI(const double &thetalab, const double &phi)
+bool Microball::IsAccepted(const double &ekinlab, const double &thetalab, const int &aid, const int &zid)
 {
+    if (!this->Is_apply_cut_kinergy)
+    {
+        return true;
+    }
     int ring_id = this->GetRingID(thetalab);
-    int det_id = this->GetDetID(thetalab, phi);
-    return (this->CsIHits[ring_id][det_id] == 0 || !this->OptionMultipleHit) ? 1 : 0;
+    return (ring_id != -1 && aid <= this->MaxA && zid <= this->MaxZ) ? ekinlab >= this->KinergyThresholdMap[{ring_id, aid, zid}] : false;
+}
+
+void Microball::ResetCsIHitMap()
+{
+    for (const auto &[ring_det, _] : this->CsIHitMap)
+    {
+        this->CsIHitMap[ring_det] = 0;
+    }
+    return;
+}
+
+int Microball::GetCsIHits()
+{
+    int Mch = 0;
+    for (auto &[ring_det, hits] : this->CsIHitMap)
+    {
+        int ring = ring_det[0];
+        int det = ring_det[1];
+
+        if (!Is_apply_cut_multiple_hit)
+        {
+            if (ring == -1 && det == -1)
+            {
+                if (!Is_apply_cut_coverage)
+                    Mch += hits;
+            }
+            else
+            {
+                Mch += hits;
+            }
+        }
+        else
+        {
+            if (hits > 0)
+            {
+                if (ring == -1 && det == -1)
+                {
+                    if (!Is_apply_cut_coverage)
+                        Mch += 1;
+                }
+                else
+                {
+                    Mch += 1;
+                }
+            }
+        }
+    }
+    return Mch;
+}
+
+int Microball::GetCsIHits(const int &ring, const int &det)
+{
+    if (this->CsIHitMap.count({ring, det}) == 0)
+    {
+        return 0;
+    }
+    return this->CsIHitMap[{ring, det}];
 }
 
 void Microball::AddCsIHit(const double &thetalab, const double &phi)
@@ -335,26 +339,59 @@ void Microball::AddCsIHit(const double &thetalab, const double &phi)
     int ring_id = this->GetRingID(thetalab);
     int det_id = this->GetDetID(thetalab, phi);
 
-    if (ring_id != -1 && det_id != -1)
+    if (this->CsIHitMap.count({ring_id, det_id}) == 0)
     {
-        this->CsIHits[ring_id][det_id]++;
+        this->CsIHitMap[{ring_id, det_id}] = 1;
     }
-    if (this->CsIHits[ring_id][det_id] >= 2 && this->OptionMultipleHit == 1)
+    else if (this->CsIHitMap.count({ring_id, det_id}) == 1)
     {
-        std::cout << Form("warning : ring %i, det %i count > 1", ring_id, det_id) << std::endl;
+        this->CsIHitMap[{ring_id, det_id}]++;
     }
     return;
 }
 
-int Microball::GetCsIHits()
+void Microball::ViewDetectorSetupMap()
 {
-    int counter = 0;
-    for (int ring = 0; ring < this->NumRing; ring++)
+    for (auto &[ring, det_array] : this->DetectorSetupMap)
     {
-        for (int det = 0; det < this->NumDet; det++)
+        std::cout << ring << " ";
+        for (auto &det : det_array)
         {
-            counter += this->GetCsIHits(ring, det);
+            std::cout << det << " ";
         }
+        std::cout << std::endl;
     }
-    return counter;
+}
+
+void Microball::ViewGeometryMap()
+{
+    for (auto &[ring_det, _] : this->PhiMap)
+    {
+        int ring = ring_det[0];
+        int det = ring_det[1];
+
+        auto print = [](auto... args)
+        {
+            ((std::cout << args << " "), ...) << std::endl;
+        };
+
+        print(ring, det, this->ThetaMap[ring][0], this->ThetaMap[ring][1], this->PhiMap[{ring, det}][0], this->PhiMap[{ring, det}][1]);
+    }
+}
+
+void Microball::ViewThresholdKinergyMap()
+{
+    for (auto &[ring_A_Z, kinergy] : this->KinergyThresholdMap)
+    {
+        int ring = ring_A_Z[0];
+        int A = ring_A_Z[1];
+        int Z = ring_A_Z[2];
+
+        auto print = [](auto... args)
+        {
+            ((std::cout << args << " "), ...) << std::endl;
+        };
+
+        print(ring, A, Z, kinergy);
+    }
 }
