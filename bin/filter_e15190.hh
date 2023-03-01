@@ -179,7 +179,13 @@ public:
     }
     void help()
     {
-        std::cout << "" << std::endl;
+        const char *msg = R"(
+            -r      reaction tag, e.g. Ca48Ni64E140
+            -i      a list of input ROOT files, separated by space.
+            -o      ROOT file output path.
+            -h      Print help message.
+        )";
+        std::cout << msg << std::endl;
     }
 
 protected:
