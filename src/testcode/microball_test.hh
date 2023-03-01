@@ -85,16 +85,16 @@ public:
             {"reaction", required_argument, 0, 'r'},
             {"input", required_argument, 0, 'i'},
             {"output", required_argument, 0, 'o'},
-            {"filter_neutron", no_argument, 0, 'n'},
-            {"filter_coverage", no_argument, 0, 'f'},
-            {"filter_threshold", no_argument, 0, 't'},
-            {"filter_multihit", no_argument, 0, 'm'},
+            {"is_apply_cut_charged_particle", no_argument, 0, 'n'},
+            {"is_apply_cut_coverage", no_argument, 0, 'f'},
+            {"is_apply_cut_kinergy", no_argument, 0, 't'},
+            {"is_apply_cut_multiple_hit", no_argument, 0, 'm'},
             {0, 0, 0, 0},
         };
 
         int option_index = 0;
         int opt;
-        while ((opt = getopt_long(argc, argv, "hr:i:o:c:f:t:m", options.data(), &option_index)) != -1)
+        while ((opt = getopt_long(argc, argv, "hr:i:o:n:f:t:m", options.data(), &option_index)) != -1)
         {
             switch (opt)
             {

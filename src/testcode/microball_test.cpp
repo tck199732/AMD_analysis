@@ -70,22 +70,10 @@ int main(int argc, char *argv[])
     Initialize_TChain(chain);
 
     Microball *microball = new Microball();
-    if (!argparser.is_apply_cut_charged_particle)
-    {
-        microball->TurnOff_ChargedParticle();
-    }
-    if (!argparser.is_apply_cut_coverage)
-    {
-        microball->TurnOff_CoverageCorrection();
-    }
-    if (!argparser.is_apply_cut_kinergy)
-    {
-        microball->TurnOff_KinergyCorrection();
-    }
-    if (!argparser.is_apply_cut_multiple_hit)
-    {
-        microball->TurnOff_MultipleHitCorrection();
-    }
+    microball->Set_Is_apply_cut_charged_particle(argparser.is_apply_cut_charged_particle);
+    microball->Set_Is_apply_cut_coverage(argparser.is_apply_cut_coverage);
+    microball->Set_Is_apply_cut_kinergy(argparser.is_apply_cut_kinergy);
+    microball->Set_Is_apply_cut_multiple_hit(argparser.is_apply_cut_multiple_hit);
 
     microball->ConfigurateSetup(reaction, "../../database/e15190/microball/acceptance/config.dat");
     microball->ReadGeometryMap("../../database/e15190/microball/acceptance/geometry.dat");
@@ -108,7 +96,7 @@ int main(int argc, char *argv[])
         {
             particle part = {amd.N[j], amd.Z[j], amd.px[j], amd.py[j], amd.pz[j]};
             part.initialize(betacms);
-            if (microball->Get_Is_apply_cut_charged_particle())
+            if (microball->Get_Is_apply_cut_coverage())
             {
                 correct_phi_value(part, microball);
             }
