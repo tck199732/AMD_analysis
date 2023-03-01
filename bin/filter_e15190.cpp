@@ -117,6 +117,7 @@ int main(int argc, char *argv[])
     TTree *tree = new TTree("AMD", "");
     Initialize_TTree(tree);
 
+    ProgressBar bar(chain->GetEntries(), argparser.reaction);
     for (int ievt = 0; ievt < chain->GetEntries(); ievt++)
     {
         chain->GetEntry(ievt);
@@ -160,6 +161,7 @@ int main(int argc, char *argv[])
         filtered_amd.b = amd.b;
         // if microball multi is 0, in experiment we don't see the event. We still keep the event here as this data can be easily removed in the analysis.
         tree->Fill();
+        bar.Update();
     }
 
     TFile *outputfile = new TFile(argparser.output_file.c_str(), "RECREATE");
