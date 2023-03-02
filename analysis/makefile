@@ -1,14 +1,14 @@
 COMPILER = g++
-INCLUDE := ${PROJECT_DIR}/src
-CFLAGS := -fPIC -O2
+INCLUDE := `root-config --libs --cflags`
+VPATH := ${PROJECT_DIR}/src
+INCLUDE += -I${VPATH}
 
-.PHONY: clean
+.PHONY: all clean
 
-all: anal anal_raw
+all: anal
 
-anal:
-	${COMPILER} anal.cpp -o anal.exe -I${INCLUDE} `root-config --libs --cflags`
-anal_raw : 
-	${COMPILER} anal_raw.cpp -o anal_raw.exe -I${INCLUDE} `root-config --libs --cflags`
+% : %.cpp
+	${COMPILER} $< -o $@.exe -I${INCLUDE} 
+
 clean:
 	rm *.exe
