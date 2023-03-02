@@ -26,9 +26,8 @@ df_helper = dataframe.DataFrameHelper()
 
 
 class Multiplicity_ImpactParameter:
-    DIR = f'{PROJECT_DIR}/result/centrality/b10fm'
-
-    def __init__(self, path=None, histname='h2_multi_b', reaction='Ca48Ni64E140', skyrme='SkM', impact_parameter=(0., 10.), mode='3', verbose=0):
+    def __init__(self, path=None, histname='h2_multi_b', **kwargs):
+            #  skyrme='SkM', table='3', mode='filtered'):
         """ A Class handle calculation from 2D histogram Impact-Parameter VS Multiplicity
         Parameter
         ---------
@@ -36,39 +35,26 @@ class Multiplicity_ImpactParameter:
             if None, use the default path
         histname : str
             name of the TH2D in the root file
-        reaction : str
-            collision string in the format of {beam}{target}E{energy}
-        skyrme : str
-            skyrme parameter set used in the simulation. For now, either `SkM` or `SLy4` or `SLy4_L108`
-        impact_parameter : tuple of float
-            range of b in the simulation. This is only included for completeness.
-        mode : str, int, float
-            simulation mode : `21` means data from table21. `3` means data from table3 (sec. decay)
-        verbose : int 
-            `0` = quiet
-            `1` = issue warning in case histogram is not found
         """
-        self.reaction = reaction
-        self.skyrme = skyrme
-        self.impact_parameter = impact_parameter
-        self.mode = str(mode)
 
-        if path is None:
-            path = pathlib.Path(
-                f'{self.DIR}/{reaction}_{skyrme}_table{mode}.root')
-            if not path.exists():
-                raise ValueError(f'path does not exist : {str(path)}')
+        attributes = ['reaction', 'mode', 'table', 'skyrme', 'impact_parameter']
+        for attr in attributes:
+            setattr(self, attr, kwargs.get(attr, None))
 
-        with root6.TFile(str(path)) as file:
+        with root6.TFile(str(path), mode='READ') as file:
             try:
                 hist = file[histname]
             except:
                 objname = file.keys()[0]
-                if verbose == 1:
-                    warnings.warn(
-                        f'hist name {histname} not found in root file. We will use the first object in the file, i.e. `{objname}`')
+                warnings.warn(
+                    f'hist name {histname} not found in root file. We will use the first object in the file, i.e. `{objname}`')
                 hist = file[objname]
-
+            
+            self.nentries = hist.GetEntries()
+            self.bins = (hist.GetNbinsX(), hist.GetNbinsY())
+            self.binwidths = (hist.GetXaxis().GetBinWidth(1), hist.GetYaxis().GetBinWidth(1))
+            self.xrange = (hist.GetXaxis().GetXmin(), hist.GetXaxis().GetXmax())
+            self.yrange = (hist.GetYaxis().GetXmin(), hist.GetYaxis().GetXmax())
             self.df = hist_reader.hist2d_to_df(hist)
 
     def MultiplicitySpectra(self, range=(-0.5, 24.5), cut=(0., 10.), bins=25, normalize=True):
