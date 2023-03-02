@@ -45,111 +45,138 @@ class PtRapidityLAB:
 
     DIR = pathlib.Path(PROJECT_DIR, '/result/spectra')
     
-    def __init__(self, particle, path=None, reaction='Ca48Ni64E140', skyrme=None, mode:Literal['primary','secondary', 'secondary_one_decay', 'experiment']='secondary', impact_parameter=(0., 3.), uball_multiplicity=(1, 25), histname=None, verbose=1):
+    def __init__(self, fname, hname, particle, reaction, **kwargs):
         """ A class for handling TH2D tranverse momentum / A v.s. rapidity / beam-rapidity
         Parameters
         ----------
+        fname : str or pathlib.Path
+            path to the root file
+        hname : str
+            name of the histogram in the ROOT file
         particle : str
-        path : str / pathlib.Path
-            path of the root file containing the h2
-        histname : str
-            fullname of the h2 in `path`
+            particle name, e.g. 'p', 'd', 't', '3He', '4He'
+        reaction : str
+            reaction name, e.g. 'Ca48Ni64E140'
+        skyrme : str, optional
+            skyrme name, e.g. 'SkM', 'SLy4', 'SLy4_L108', by default None
+        mode : str, optional
+            mode name, e.g. 'primary', 'secondary', by default None
+        impact_parameter : float, optional
+            impact parameter, by default None
+        multiplicity : int, optional
+            multiplicity, by default None
         """
+
+        self.fname = fname
+        self.hname = hname
         self.particle = e15190.Particle(particle)
         self.reaction = reaction
-        self.skyrme = 'EXP' if skyrme is None else skyrme
-        self.impact_parameter = impact_parameter
-        self.uball_multiplicity = uball_multiplicity
-        self.mode = mode
 
-        if path is None:
-            if skyrme != 'EXP':
-                path = pathlib.Path(self.DIR, f'{reaction}_{skyrme}.root')
-            if not path.exists():
-                raise IOError(f'file not found : {str(path)}')
-            if not (self.path.is_file() and os.access(self.path, os.R_OK)):
-                raise IOError(f'check file permission {str(path)}')
+        attributes = ['skyrme', 'mode', 'impact_parameeter', 'multiplicity']
+        for attr in attributes:
+            if attr in kwargs:
+                setattr(self, attr, kwargs[attr])
 
-        if histname is None:
-            if skyrme != 'EXP':
-                histname = f'h2_pt_rapidity_{mode}_{particle}'
-            else:
-                histname = f'h2_pt_rapidity_{particle}'
-
-        with root6.TFile(str(path)) as file:
+        with root6.TFile(str(fname), mode='READ') as file:
             try:
-                hist = file[histname]
+                hist = file[hname]
             except:
                 objname = file.keys()[0]
-                if verbose == 1:
-                    warnings.warn(
-                        f'hist name {histname} not found in root file. We will use the first object in the file, i.e. `{objname}`')
+                warnings.warn(
+                    f'hist name {hname} not found in root file. We will use the first object in the file, i.e. `{objname}`')
                 hist = file[objname]
 
+            self.nentries = hist.GetEntries()
+            self.bins = (hist.GetNbinsX(), hist.GetNbinsY())
+            self.binwidths = (hist.GetXaxis().GetBinWidth(1), hist.GetYaxis().GetBinWidth(1))
+            self.xrange = (hist.GetXaxis().GetXmin(), hist.GetXaxis().GetXmax())
+            self.yrange = (hist.GetYaxis().GetXmin(), hist.GetYaxis().GetXmax())
             self.df = hist_reader.hist2d_to_df(hist)
 
-    def query(self, df=None, xrange=(0.4, 0.6), yrange=(0., 600.), inplace=False):
-        if df is None:
-            df = self.df.copy()
-
-        dx = np.diff(np.unique(df.x)[0:2])
-        x1 = xrange[0] - dx/2.
-        x2 = xrange[1] + dx/2
-        dy = np.diff(np.unique(df.y)[0:2])
-        y1 = yrange[0] - dy/2.
-        y2 = yrange[1] + dy/2
-
-        # In TH2D, projection is done on the bin range (bin1, bin2) instead of numerical range
-        # e.g. if bin width is 0.005, then 0.396 is included in ROOT Projection.
-        # 0.395 is not included becasue any value exactly the same as the interval would be filled in the bin on the left. so (> and <=)
-
-        df.query(f'x > {x1} & x <= {x2} & y > {y1} & y <= {y2}', inplace=True)
-        if inplace:
-            self.df = df
-        return df
-    
-    # def correct_coverage(self, df=None, xrange=(0.4, 0.6), yrange=(0., 600.)):
-    #     df = self.query(df, xrange, yrange)
-    #     df.query('z > 0.0', inplace=True)
-    #     df.reset_index(inplace=True, drop=True)
-    #     correction = np.ones(df.shape[0])
-    #     for val, subdf in df.groupby('y'):
-    #         if subdf.shape[0] == 1:
-    #             correction[np.array(subdf.index)] = 0.
-    #         else:
-    #             dx = np.diff(np.array(subdf.x)[0:2])
-    #             x1 = np.min(subdf.x) + dx * np.random.uniform(-0.5, 0.5)
-    #             x2 = np.max(subdf.x) + dx * np.random.uniform(-0.5, 0.5)
-    #             correction[np.array(subdf.index)] = abs(x2-x1)
-    #     df['correction'] = correction
-
-    #     df.query('correction > 0.0', inplace=True)
-    #     df['correction'] = df['correction'] / np.diff(xrange)
-    #     df['z'] = df['z']/df['correction']
-    #     df['z_err'] = df['z_err']/df['correction']
-    #     df.drop('correction', axis=1, inplace=True)
-    #     return df
-
-    def PtSpectrum(self, xrange=(0.4, 0.6), yrange=(0., 600.), bins=30,  correct_coverage=False, correct_range=(0., 600)):
-        """ calculate ProjectionX of the h2
+    def _slice(self, xrange=(0.4,0.6), yrange=(0., 600.)):
+        """ Slice the dataframe by the given range, 
         Parameters
         ----------
-        bins : int
-            number of bins in Pt spectra
-        correct_coverage : bool
-            will correct for coverage if True
+        xrange : tuple, optional
+            x range, by default (0.4,0.6)
+        yrange : tuple, optional
+            y range, by default (0., 600.)
+        Returns
+        -------
+        pandas.DataFrame
+            sliced dataframe
+        Notes
+        -----
+        if bin width is `0.005` and we want to slice from `0.4` to `0.6`,  then 0.396 is included in ROOT Projection.
+        0.395 is not included becasue any value at the interval would be filled in the bin on the left. so (> and <=)
         """
+        df = self.df.copy()
+        x1 = xrange[0] - self.binwidths[0] / 2.
+        x2 = xrange[1] + self.binwidths[0] / 2
+        y1 = yrange[0] - self.binwidths[1] / 2.
+        y2 = yrange[1] + self.binwidths[1] / 2
+        return df.query(f'x > {x1} & x <= {x2} & y > {y1} & y <= {y2}')
+
+    def correct_coverage(self, xrange=(0.4, 0.6), yrange=(0., 600.), seed=0):
+        """ Apply coverage-correction to the histogram. 
+        Parameters
+        ----------
+        xrange : tuple, optional
+            x range, by default (0.4, 0.6)
+        yrange : tuple, optional
+            y range, by default (0., 600.)
+        seed : int, optional
+            random seed, by default 0
+        Returns
+        ------- 
+        pandas.DataFrame
+            corrected dataframe
+        """
+        rng = np.random.default_rng(seed=seed)
+
+        df = self._slice(xrange, yrange)
+        for _, subdf in df.groupby('y'):
+            if subdf.shape[0] == 0:
+                df['z'].iloc[subdf.index] = 0.
+                df['z_err'].iloc[subdf.index] = 0.
+            else:   
+                x1 = np.min(subdf['x']) + self.binwidths[0] * rng.uniform(-0.5, 0.5)
+                x2 = np.max(subdf['x']) + self.binwidths[0] * rng.uniform(-0.5, 0.5)
+                df['z'] /= abs(x2-x1) / np.diff(xrange)
+                df['z_err'] /= abs(x2-x1) / np.diff(xrange)
+
+        return df
+
+    def PtSpectrum(self, xrange=(0.4, 0.6), yrange=(0., 600.), bins=30,  correct_coverage=False, **kwargs):
+        return self.get_pt(xrange, yrange, bins, correct_coverage, **kwargs)
+
+    def get_pt(self, xrange=(0.4, 0.6), yrange=(0., 600.), bins=30,  correct_coverage=False, **kwargs):
+        """ Get the transverse momentum spectrum
+        Parameters
+        ----------
+        xrange : tuple, optional
+            x range, by default (0.4, 0.6)
+        yrange : tuple, optional
+            y range, by default (0., 600.)
+        bins : int, optional
+            number of bins, by default 30
+        correct_coverage : bool, optional   
+            apply coverage correction, by default False
+        **kwargs : dict
+            keyword arguments for `correct_coverage`
+        Returns
+        -------
+        pandas.DataFrame
+            transverse momentum spectrum
+        """
+
         if correct_coverage:
-            df = self.correct_coverage(xrange=xrange, yrange=correct_range)
+            df = self.correct_coverage(xrange=xrange, yrange=yrange, **kwargs)
         else:
-            df = self.df.query(f'x > {xrange[0]} & x <= {xrange[1]} & y > {yrange[0]} & y <= {yrange[1]}')
-
-        df = df.query('z > 0.0')
-
-        hist, edges = np.histogram(
-            df.y, range=yrange, bins=bins, weights=df['z'])
-        histerr, edges = np.histogram(
-            df.y, range=yrange, bins=bins, weights=df['z_err']**2)
+            df = self._slice(xrange, yrange)
+        
+        hist, edges = np.histogram(df['y'], range=yrange, bins=bins, weights=df['z'])
+        histerr, _ = np.histogram(df['y'], range=yrange, bins=bins, weights=df['z_err']**2)
         histerr = np.sqrt(histerr)
 
         norm = np.diff(yrange) / bins * np.diff(xrange)
@@ -157,14 +184,29 @@ class PtRapidityLAB:
         return pd.DataFrame({
             'x': 0.5 * (edges[1:] + edges[:-1]),
             'y': hist / norm,
-            'y_err': histerr/norm,
-            'y_ferr':  np.divide(histerr, hist, out=np.zeros_like(histerr), where=(hist != 0.0))
+            'y_err': histerr / norm,
+            'y_ferr':  np.divide(histerr, hist, where=(hist != 0.0))
         })
 
     def RapidityDistribution(self, xrange=(0,1), yrange=(0,800), bins=100):
+        return self.get_normed_rapidity(xrange, yrange, bins)
+    
+    def get_normed_rapidity(self, xrange=(0,1), yrange=(0,800), bins=100):
         """ Project to X-axis to get distribution of `rapidity_lab` / `beam_rapidity`
+        Parameters
+        ----------
+        xrange : tuple, optional
+            x range, by default (0,1)
+        yrange : tuple, optional
+            y range, by default (0,800)
+        bins : int, optional
+            number of bins, by default 100
+        Returns
+        -------
+        pandas.DataFrame
+            rapidity distribution
         """
-        df = self.df.query(f'x > {xrange[0]} & x <= {xrange[1]} & y > {yrange[0]} & y <= {yrange[1]}')
+        df = self._slice(xrange, yrange)
         hist, _ = np.histogram(df['x'], weights=df['z'], bins=bins, range=xrange)
         hist_err, _ = np.histogram(df['x'], weights=df['z_err']**2, bins=bins, range=xrange)
         hist_err = np.sqrt(hist_err)
@@ -174,192 +216,115 @@ class PtRapidityLAB:
             'x' : 0.5 * (x[1:] + x[:-1]),
             'y' : hist,
             'y_err' : hist_err,
-            'y_ferr' : np.divide(hist_err, hist, where=(hist!=0.))
+            'y_ferr' : np.divide(hist_err, hist, where=(hist != 0.))
         })
 
-"""
-    def RapidityCMS(self, range=(-0.5, 0.5), bins=100):
-        df = self.df.copy()
-        df.query('z > 0.0', inplace=True)
-        dx = np.diff(np.unique(df.x)[0:2])
-        x = df.x.to_numpy() + dx * np.random.uniform(-0.5, 0.5, size=len(df.x))
-
-        rapidity_cms = x * self.beam_rapidity - 0.5 * \
-            np.log((1+self.betacms)/(1-self.betacms))
-
-        hist, edges = np.histogram(
-            rapidity_cms, range=range, bins=bins, weights=df['z'])
-        histerr, edges = np.histogram(
-            rapidity_cms, range=range, bins=bins, weights=df['z_err']**2)
-        histerr = np.sqrt(histerr)
-
-        norm = np.diff(range) / bins
-
-        return pd.DataFrame({
-            'x': 0.5 * (edges[1:] + edges[:-1]),
-            'y': hist/norm,
-            'y_err': histerr/norm,
-            'y_ferr': np.divide(histerr, hist, out=np.zeros_like(histerr), where=(hist != 0.0))
-        })
-
-    def plotPtRapidity(self, ax=None, range=[[0., 1.], [0., 600.]], bins=[100, 600], **kwargs):
-        df = self.df.copy()
-        return df_helper.plot2d(ax, df, range=range, bins=bins, **kwargs)
-
-    def plotPtSpectrum(self, ax=None, xrange=(0.4, 0.6), yrange=(0, 600), bins=30, correct_coverage=False, correct_range=(0., 600), **kwargs):
-        df = self.PtSpectrum(xrange=xrange, yrange=yrange,
-                             bins=bins, correct_coverage=correct_coverage, correct_range=correct_range)
-        return df_helper.plot1d(ax, df, **kwargs)
-
-    def plotRapidityCMS(self, ax=None, range=(-0.5, 0.5), bins=100, **kwargs):
-        df = self.RapidityCMS(range=range, bins=bins)
-        return df_helper.plot1d(ax, df, **kwargs)
-
-    def EkinThetaCMS(self, xrange=(0.4, 0.6), yrange=(0., 600.), correct_coverage=False):
-        df = self.correct_coverage(xrange=xrange, yrange=yrange) if correct_coverage else self.query(
-            xrange=xrange, yrange=yrange)
-
-        mass = 938.272
-
-        dx = np.diff(np.unique(df.x)[0:2])
-        dy = np.diff(np.unique(df.y)[0:2])
-
-        pt = df.y + dy * np.random.uniform(-0.5, 0.5, size=len(df.y))
-        rapidity_lab = df.x + dx * \
-            (np.random.uniform(-0.5, 0.5, size=len(df.x)))
-        rapidity_lab *= self.beam_rapidity
-        rapidity_cms = rapidity_lab - 0.5 * \
-            np.log((1.+self.betacms)/(1.-self.betacms))
-
-        pzcms = np.sqrt(pt**2 + mass**2) * np.sinh(rapidity_cms)
-        ekincms = np.sqrt(pt**2 + mass**2) * np.cosh(rapidity_cms) - mass
-        thetacms = np.degrees(np.arctan2(pt, pzcms))
-
-        return pd.DataFrame({
-            'x': ekincms,
-            'y': thetacms,
-            'z': df['z'],
-            'z_err': df['z_err'],
-            'z_ferr': np.divide(df['z_err'], df['z'], out=np.zeros_like(df['z_err']), where=(df['z'] > 0.0))
-        })
-
-    def MomentumRapidityCMS(self, xrange=(0., 1.), yrange=(0., 600.), correct_coverage=False):
+    def get_kinergy_theta_CMS(self, xrange=(0.4, 0.6), yrange=(0., 600.), correct_coverage=False, **kwargs):
+        """ Get the 2D histogram kinergy per A versus theta in CMS
+        Parameters
+        ----------
+        xrange : tuple, optional
+            x range, by default (0.4, 0.6)
+        yrange : tuple, optional
+            y range, by default (0., 600.)
+        correct_coverage : bool, optional
+            apply coverage correction, by default False
+        **kwargs : dict
+            keyword arguments for `correct_coverage`
+        Returns
+        -------
+        pandas.DataFrame
+            kinergy per A versus theta in CMS
+        """
         if correct_coverage:
-            df = self.correct_coverage(xrange=xrange, yrange=yrange)
+            df = self.correct_coverage(xrange=xrange, yrange=yrange, **kwargs)
         else:
-            df = self.query(xrange=xrange, yrange=yrange)
+            df = self._slice(xrange, yrange)
+        
+        #alias
+        mass = self.particle.mass
 
-        mass = 938.272
-        dx = np.diff(np.unique(df.x)[0:2])
-        dy = np.diff(np.unique(df.y)[0:2])
-        pt = df.y + dy * np.random.uniform(-0.5, 0.5, size=len(df.y))
-        rapidity_lab = df.x + dx * \
-            (np.random.uniform(-0.5, 0.5, size=len(df.x)))
-        rapidity_lab *= self.beam_rapidity
-        rapidity_cms = rapidity_lab - 0.5 * \
-            np.log((1.+self.betacms)/(1.-self.betacms))
+        # randomize each bin
+        rng = np.random.default_rng(seed=kwargs.get('seed', 0))
+        x = df['x'].to_numpy() + self.binwidths[0] * rng.uniform(-0.5, 0.5, size=df.shape[0])
+        y = df['y'].to_numpy() + self.binwidths[1] * rng.uniform(-0.5, 0.5, size=df.shape[0])
 
-        pzcms = np.sqrt(pt**2 + mass**2) * np.sinh(rapidity_cms)
-        pcms = np.sqrt(pt**2 + pzcms**2)
+        # get reaction constants
+        beam_rapidity = e15190.CollisionReaction.get_rapidity_beam(self.reaction)
+        beta_cms = e15190.CollisionReaction.get_betacms(self.reaction)
 
+        # calculate rapidity in CMS and total transverse momentum
+        rapidity_cms = x * beam_rapidity
+        rapidity_cms -= 0.5 * np.log((1 + beta_cms) / (1 - beta_cms))
+        pt = y * (self.particle.N + self.particle.Z)
+        
+        # calculate pz and theta in CMS
+        pz_cms = pt * np.sinh(rapidity_cms)
+        theta_cms = np.degrees(np.arctan2(pt, pz_cms))
+
+        # calculate kinergy (per A) in CMS
+        kinergy_cms = np.sqrt(pt**2 + mass**2) * np.cosh(rapidity_cms) - mass
+        kinergy_cms_per_A = kinergy_cms / (self.particle.N + self.particle.Z)
+        
         return pd.DataFrame({
-            'x': pcms,
-            'y': rapidity_cms,
+            'x': theta_cms,
+            'y': kinergy_cms_per_A,
             'z': df['z'],
             'z_err': df['z_err'],
-            'z_ferr': np.divide(df['z_err'], df['z'], out=np.zeros_like(df['z_err']), where=(df['z'] > 0.0))
+            'z_ferr': df['z_ferr']
         })
 
-    def MomentumCMS(self, xrange=(0., 1.), yrange=(0., 800.), bins=40, cuts=[(-1.0, 1.0), (0., 800.)], correct_coverage=False):
-        # Projecti Momentum from Momentum-Rapidity
-        df = self.MomentumRapidityCMS(
-            xrange=xrange, yrange=yrange, correct_coverage=correct_coverage)
+    def get_pmag_rapidity_CMS(self, xrange=(0.4, 0.6), yrange=(0., 600.), correct_coverage=False, **kwargs):
+        """ Get the 2D histogram momentum magnitude versus rapidity in CMS
+        Parameters
+        ----------
+        xrange : tuple, optional
+            x range, by default (0.4, 0.6)
+        yrange : tuple, optional
+            y range, by default (0., 600.)
+        correct_coverage : bool, optional       
+            apply coverage correction, by default False
+        **kwargs : dict 
+            keyword arguments for `correct_coverage`
+        Returns
+        -------
+        pandas.DataFrame    
+            momentum magnitude versus rapidity in CMS
+        """
+        if correct_coverage:
+            df = self.correct_coverage(xrange=xrange, yrange=yrange, **kwargs)
+        else:
+            df = self._slice(xrange, yrange)
+        
+        #alias
+        mass = self.particle.mass
 
-        df.query(
-            f'y >= {cuts[0][0]} & y <= {cuts[0][1]} & x >= {cuts[1][0]} & x <= {cuts[1][1]}', inplace=True)
+        # randomize each bin
+        rng = np.random.default_rng(seed=kwargs.get('seed', 0))
+        x = df['x'].to_numpy() + self.binwidths[0] * rng.uniform(-0.5, 0.5, size=df.shape[0])
+        y = df['y'].to_numpy() + self.binwidths[1] * rng.uniform(-0.5, 0.5, size=df.shape[0])
 
-        hist, edges = np.histogram(
-            df.x, range=yrange, bins=bins, weights=df['z'])
+        # get reaction constants
+        beam_rapidity = e15190.CollisionReaction.get_rapidity_beam(self.reaction)
+        beta_cms = e15190.CollisionReaction.get_betacms(self.reaction)
 
-        histerr, edges = np.histogram(
-            df.x, range=yrange, bins=bins, weights=df['z_err']**2)
-        histerr = np.sqrt(histerr)
-        norm = np.diff(yrange) / bins * np.diff(xrange)
+        rapidity_cms = x * beam_rapidity
+        rapidity_cms -= 0.5 * np.log((1 + beta_cms) / (1 - beta_cms))
+        pt = y * (self.particle.N + self.particle.Z)
+        
+        # calculate pz and theta in CMS
+        pz_cms = pt * np.sinh(rapidity_cms)
+        pmag_cms = np.sqrt(pt**2 + pz_cms**2)
+        pmag_cms_per_A = pmag_cms / (self.particle.N + self.particle.Z)
 
         return pd.DataFrame({
-            'x': 0.5 * (edges[1:] + edges[:-1]),
-            'y': hist / norm,
-            'y_err': histerr/norm,
-            'y_ferr':  np.divide(histerr, hist, out=np.zeros_like(histerr), where=(hist != 0.0))
+            'x': rapidity_cms,
+            'y': pmag_cms_per_A,
+            'z': df['z'],
+            'z_err': df['z_err'],
+            'z_ferr': df['z_ferr']
         })
-
-    def Multiplicity(self, xrange=(0.4, 0.6), yrange=(0., 600.), bins=30,  correct_coverage=False, correct_range=(0., 600)):
-        # return number of particle after normalization
-        df = self.PtSpectrum(xrange=xrange, yrange=yrange, bins=bins,
-                             correct_coverage=correct_coverage, correct_range=correct_range)
-        return np.sum(df.y) * np.diff(xrange) * np.diff(yrange)/bins
+        
 
 
 
-class EkinThetaCMS:
-    def __init__(self, particle, df=None, reaction=None, path=None, skyrme='SkM', impact_parameter=(0., 3.), uball_multiplicity=(1, 25), mode='all'):
-
-        if df is None:
-            df = PtRapidityLAB(
-                particle=particle, reaction=reaction, path=path, skyrme=skyrme,
-                impact_parameter=impact_parameter, uball_multiplicity=uball_multiplicity, mode=mode
-            )
-            df = df.EkinThetaCMS()
-        df.columns = ['x', 'y', 'z', 'z_err', 'z_ferr']
-        self.df = df
-
-    def query(self, df=None, xrange=(0.4, 0.6), yrange=(0., 600.)):
-        if df is None:
-            df = self.df.copy()
-
-        dx = np.diff(np.unique(df.x)[0:2])
-        x1 = xrange[0] - dx/2.
-        x2 = xrange[1] + dx/2
-        dy = np.diff(np.unique(df.y)[0:2])
-        y1 = yrange[0] - dy/2.
-        y2 = yrange[1] + dy/2
-
-        df.query(
-            f'x >= {x1} & x <= {x2} & y >= {y1} & y <= {y2}', inplace=True)
-        return df
-
-    def EkinCMS(self, xrange=(0., 200.), yrange=(0., 180.), bins=50):
-        df = self.query(xrange=xrange, yrange=yrange)
-        df.query('z > 0.0', inplace=True)
-        hist, edges = np.histogram(
-            df.x, range=xrange, bins=bins, weights=df['z'])
-        histerr, edges = np.histogram(
-            df.x, range=xrange, bins=bins, weights=df['z_err']**2)
-        histerr = np.sqrt(histerr)
-
-        norm = np.diff(xrange) / bins
-        return pd.DataFrame({
-            'x': 0.5 * (edges[1:] + edges[:-1]),
-            'y': hist / norm,
-            'y_err': histerr / norm,
-            'y_ferr': np.divide(histerr, hist, out=np.zeros_like(histerr), where=(hist > 0.0))
-        })
-
-    def ThetaCMS(self, xrange=(0., 200.), yrange=(0., 180.), bins=180):
-        df = self.query(xrange=xrange, yrange=yrange)
-        df.query('z > 0.0', inplace=True)
-        hist, edges = np.histogram(
-            df.y, range=yrange, bins=bins, weights=df['z'])
-        histerr, edges = np.histogram(
-            df.y, range=yrange, bins=bins, weights=df['z_err']**2)
-        histerr = np.sqrt(histerr)
-
-        norm = np.diff(xrange) / bins
-        return pd.DataFrame({
-            'x': 0.5 * (edges[1:] + edges[:-1]),
-            'y': hist / norm,
-            'y_err': histerr / norm,
-            'y_ferr': np.divide(histerr, hist, out=np.zeros_like(histerr), where=(hist > 0.0))
-        })
-
-"""
