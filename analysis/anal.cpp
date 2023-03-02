@@ -1,18 +1,13 @@
 #include "anal.hh"
-struct particle
-{
-    int N, Z;
-    double px, py, pz;
-};
+
 class Histograms
 {
 public:
     Histograms(const std::string &suffix);
     ~Histograms() { ; }
-    void fill(const particle &particle, const double betacms, const double &beam_rapidity, const double &weight);
+    void fill(const particle &particle, const double &weight);
     void normalize(const double &scale);
     void write();
-
     std::map<std::string, TH2D *> h2_pta_rapidity_lab;
 
 protected:
@@ -20,128 +15,129 @@ protected:
         "n", "p", "d", "t", "3He", "4He", "coal_n", "coal_p"};
 };
 
+void Replace_Errorbars(Histograms *&hist, Histograms *&hist_one_decay)
+{
+    for (auto &[pn, h2] : hist->h2_pta_rapidity_lab)
+    {
+        for (int i = 0; i < h2->GetNbinsX(); i++)
+        {
+            for (int j = 0; j < h2->GetNbinsY(); j++)
+            {
+                double error = hist_one_decay->h2_pta_rapidity_lab[pn]->GetBinError(i + 1, j + 1);
+                h2->SetBinError(i + 1, j + 1, error);
+            }
+        }
+    }
+    return;
+}
+
+void analyze_table3(TChain *&chain, Histograms *&hist, const ArgumentParser &argparser);
+void analyze_table21(TChain *&chain, Histograms *&hist, const ArgumentParser &argparser);
+
 int main(int argc, char *argv[])
 {
     ArgumentParser argparser(argc, argv);
+    ReadAMETable(AME_MASS_TABLE);
 
-    std::string reaction = argparser.reaction;
-    std::string output_file = argparser.output_file;
+    TChain *chain = new TChain("AMD");
+    Initialize_TChain(chain, argparser.input_files, argparser.mode, argparser.table);
 
-    // initialize Tchains and other structures
-    TChain *chain21 = new TChain("AMD");
-    TChain *chain3 = new TChain("AMD");
-    Initialize_TChain(chain21, argparser.input_files_table21, "raw", "21");
-    Initialize_TChain(chain3, argparser.input_files_table3, "filtered", "3");
-
-    // initialize Histogramss in different mode
-    Histograms *histo21 = new Histograms("primary");
-    Histograms *histo3 = new Histograms("secondary");
-    Histograms *histo3_one_decay = new Histograms("secondary_one_decay");
-
-    // define physics quantities
-    double betacms = Physics::GetReactionBeta(reaction);
-    double beam_rapidity = Physics::GetBeamRapidity(reaction);
-
-    int nevents21 = chain21->GetEntries();
-    int nevents3 = chain3->GetEntries();
-
-    if (argparser.verbose == 1)
+    Histograms *hist = 0;
+    if (argparser.table == "3")
     {
-        std::cout << "--------------------------------------------------------------------" << std::endl;
-        std::cout << "reaction : " << reaction << std::endl;
-        std::cout << "betacms : " << betacms << std::endl;
-        std::cout << "beam rapidity : " << beam_rapidity << std::endl;
-        std::cout << "nevents21 : " << nevents21 << std::endl;
-        std::cout << "nevents3  : " << nevents3 << std::endl;
-        std::cout << "uball-multiplicity cut : >=" << argparser.cut_on_uball_charged_particles << std::endl;
-        std::cout << "impact-parameter cut : " << argparser.impact_parameter[0] << " " << argparser.impact_parameter[1] << std::endl;
-        std::cout << "--------------------------------------------------------------------" << std::endl;
+        hist = new Histograms("secondary");
+        analyze_table3(chain, hist, argparser);
+    }
+    else if (argparser.table == "21")
+    {
+        hist = new Histograms("primary");
+        analyze_table21(chain, hist, argparser);
     }
 
-    // counter of weights of each primary event
-    std::vector<double> weights(nevents21, 0.);
-    double norm_table3 = 0.;
-    double norm_table3_one_decay = 0.;
-    double norm_table21 = 0.;
+    // saving results
+    TFile *outputfile = new TFile(argparser.output_file.c_str(), "RECREATE");
+    outputfile->cd();
+    hist->write();
+    outputfile->Write();
+}
 
-    // start filling histogram for table3
-    auto start3 = std::chrono::steady_clock::now();
-    for (int ievt3 = 0; ievt3 < nevents3; ievt3++)
+void analyze_table3(TChain *&chain, Histograms *&hist, const ArgumentParser &argparser)
+{
+    Histograms *hist_one_decay = new Histograms("secondary_one_decay");
+    double betacms = Physics::GetReactionBeta(argparser.reaction);
+    double beam_rapidity = Physics::GetBeamRapidity(argparser.reaction);
+
+    int nevents = chain->GetEntries();
+    double norm = 0.;
+    double norm_one_decay = 0.;
+
+    for (int ievt = 0; ievt < nevents; ievt++)
     {
-        chain3->GetEntry(ievt3);
+        chain->GetEntry(ievt);
+        int multi;
+        if (argparser.mode == "filtered")
+            multi = amd.Nc;
+        else if (argparser.mode == "raw")
+            multi = amd.multi;
 
-        if (amd.Nc >= argparser.cut_on_uball_charged_particles && amd.b >= argparser.impact_parameter[0] && amd.b <= argparser.impact_parameter[1])
+        if (multi >= argparser.cut_on_multiplicity[0] && multi <= argparser.cut_on_multiplicity[1] && amd.b >= argparser.cut_on_impact_parameter[0] && amd.b <= argparser.cut_on_impact_parameter[1])
         {
-            norm_table3 += 1. / NDECAYS;
-            if (ievt3 < nevents3 / NDECAYS)
+            norm += 1. / NDECAYS;
+            if (ievt < nevents / NDECAYS)
             {
-                norm_table3_one_decay += 1.;
+                norm_one_decay += 1.;
             }
         }
         else
         {
             continue;
         }
-        weights[ievt3 % nevents21] += 1.;
 
         for (int i = 0; i < amd.multi; i++)
         {
             particle particle = {amd.N[i], amd.Z[i], amd.px[i], amd.py[i], amd.pz[i]};
-
-            if (ievt3 < nevents3 / NDECAYS)
+            particle.initialize(betacms, beam_rapidity);
+            if (ievt < nevents / NDECAYS)
             {
-                histo3_one_decay->fill(particle, betacms, beam_rapidity, 1.);
+                hist_one_decay->fill(particle, 1.);
             }
-            histo3->fill(particle, betacms, beam_rapidity, 1. / NDECAYS);
+            hist->fill(particle, 1. / NDECAYS);
         }
     }
-    auto end3 = std::chrono::steady_clock::now();
-    std::chrono::duration<double> timer3 = end3 - start3;
+    hist->normalize(norm);
+    hist_one_decay->normalize(norm_one_decay);
+    Replace_Errorbars(hist, hist_one_decay);
+}
 
-    // filling Histograms for table21
-    auto start21 = std::chrono::steady_clock::now();
-    for (int ievt21 = 0; ievt21 < nevents21; ievt21++)
+void analyze_table21(TChain *&chain, Histograms *&hist, const ArgumentParser &argparser)
+{
+    double betacms = Physics::GetReactionBeta(argparser.reaction);
+    double beam_rapidity = Physics::GetBeamRapidity(argparser.reaction);
+
+    int nevents = chain->GetEntries();
+    double norm = 0.;
+
+    for (int ievt = 0; ievt < nevents; ievt++)
     {
-        chain21->GetEntry(ievt21);
-        weights[ievt21] /= 1.0 * NDECAYS;
+        chain->GetEntry(ievt);
 
-        for (unsigned int i = 0; i < amd.multi; i++)
+        if (amd.multi >= argparser.cut_on_multiplicity[0] && amd.multi <= argparser.cut_on_multiplicity[1] && amd.b >= argparser.cut_on_impact_parameter[0] && amd.b <= argparser.cut_on_impact_parameter[1])
         {
-            double A = amd.N[i] + amd.Z[i];
-            particle particle = {amd.N[i], amd.Z[i], amd.px[i] * A, amd.py[i] * A, amd.pz[i] * A};
-            histo21->fill(particle, betacms, beam_rapidity, weights[ievt21]);
+            norm += 1.;
+        }
+        else
+        {
+            continue;
         }
 
-        norm_table21 += weights[ievt21];
-    }
-    auto end21 = std::chrono::steady_clock::now();
-    std::chrono::duration<double> timer21 = end21 - start21;
-
-    // replacing table3 errorbars by table3-one-decay
-    for (auto &[pn, h2] : histo3->h2_pta_rapidity_lab)
-    {
-        for (int i = 0; i < h2->GetNbinsX(); i++)
+        for (int i = 0; i < amd.multi; i++)
         {
-            for (int j = 0; j < h2->GetNbinsY(); j++)
-            {
-                double error = histo3_one_decay->h2_pta_rapidity_lab[pn]->GetBinError(i + 1, j + 1);
-                h2->SetBinError(i + 1, j + 1, error);
-            }
+            particle particle = {amd.N[i], amd.Z[i], amd.px[i], amd.py[i], amd.pz[i]};
+            particle.initialize(betacms, beam_rapidity);
+            hist->fill(particle, 1.);
         }
     }
-
-    // saving results
-    TFile *outputfile = new TFile(output_file.c_str(), "RECREATE");
-    outputfile->cd();
-    histo21->normalize(norm_table21);
-    histo3->normalize(norm_table3);
-    histo3_one_decay->normalize(norm_table3_one_decay);
-    histo21->write();
-    histo3->write();
-    histo3_one_decay->write();
-    outputfile->Write();
-    std::cout << "Elapsed Time reading table3 : " << timer3.count() << std::endl;
-    std::cout << "Elapsed Time reading table21 : " << timer21.count() << std::endl;
+    hist->normalize(norm);
 }
 
 Histograms::Histograms(const std::string &suffix)
@@ -155,42 +151,24 @@ Histograms::Histograms(const std::string &suffix)
     }
 }
 
-void Histograms::fill(const particle &particle, const double betacms, const double &beam_rapidity, const double &weight)
+void Histograms::fill(const particle &particle, const double &weight)
 {
     std::string name = Physics::GetNucleiName(particle.Z, particle.Z + particle.N);
+
     double A = particle.Z + particle.N;
-
-    double mass = Physics::GetNucleiMass(particle.Z, A);
-    // physics quantities (total, not per nucleon)
-    double pt = Physics::GetPt(particle.px, particle.py);
-    double p = Physics::GetP(pt, particle.pz);
-    double kinergy = Physics::GetEkin(mass, p);
-    double rapidity_cms = Physics::GetRapidity(kinergy, particle.pz, mass);
-
-    double pz_lab = Physics::boostz(mass, particle.pz, kinergy, -betacms);
-    double p_lab = Physics::GetP(pt, pz_lab);
-    double kinergy_lab = Physics::GetEkin(mass, p_lab);
-    double rapidity_lab = Physics::GetRapidity(kinergy_lab, pz_lab, mass);
-
-    double rapidity_lab_normed = rapidity_lab / beam_rapidity;
-
-    // std::cout << "pt=" << pt << std::endl;
-    // std::cout << "p=" << p << std::endl;
-    // std::cout << "mass=" << mass << std::endl;
-
     if (this->h2_pta_rapidity_lab.count(name) == 1)
     {
-        this->h2_pta_rapidity_lab[name]->Fill(rapidity_lab_normed, pt / A, weight);
+        this->h2_pta_rapidity_lab[name]->Fill(particle.rapidity_lab_normed, particle.pmag_trans / A, weight);
     }
 
     // fill coalescence
     if (this->h2_pta_rapidity_lab.count("coal_p") == 1)
     {
-        this->h2_pta_rapidity_lab["coal_p"]->Fill(rapidity_lab_normed, pt / A, weight * particle.Z);
+        this->h2_pta_rapidity_lab["coal_p"]->Fill(particle.rapidity_lab_normed, particle.pmag_trans / A, weight * particle.Z);
     }
     if (h2_pta_rapidity_lab.count("coal_n") == 1)
     {
-        this->h2_pta_rapidity_lab["coal_n"]->Fill(rapidity_lab_normed, pt / A, weight * particle.N);
+        this->h2_pta_rapidity_lab["coal_n"]->Fill(particle.rapidity_lab_normed, particle.pmag_trans / A, weight * particle.N);
     }
     return;
 }
