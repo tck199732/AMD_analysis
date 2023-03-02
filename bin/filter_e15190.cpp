@@ -117,6 +117,8 @@ int main(int argc, char *argv[])
     TTree *tree = new TTree("AMD", "");
     Initialize_TTree(tree);
 
+    ReadAMETable(AME_MASS_TABLE);
+
     ProgressBar bar(chain->GetEntries(), argparser.reaction);
     for (int ievt = 0; ievt < chain->GetEntries(); ievt++)
     {
