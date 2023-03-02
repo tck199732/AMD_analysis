@@ -15,20 +15,17 @@
 #include <filesystem>
 namespace fs = std::filesystem;
 
-struct particle
-{
-    int N, Z;
-    double px, py, pz_cms;
-    double kinergy_lab, pz_lab;
-    double theta_lab, phi;
-    void initialize(const double &betacms);
-};
-
 std::map<std::array<int, 2>, double> AME_MASS_TABLE;
-void ReadAMETable(const std::string &filename, std::map<std::array<int, 2>, double> &ame_mass_table)
+void ReadAMETable(std::map<std::array<int, 2>, double> &ame_mass_table, const std::string &filename = "")
 {
-    std::ifstream infile(filename);
-
+    std::string path = filename;
+    if (path.empty())
+    {
+        fs::path project_dir = std::getenv("PROJECT_DIR");
+        fs::path dat_path = project_dir / "database/ame/ame_mass.txt";
+        path = fs::absolute(dat_path);
+    }
+    std::ifstream infile(path.c_str());
     infile.ignore(99, '\n');
     int Z, A;
     double mass;
@@ -38,6 +35,15 @@ void ReadAMETable(const std::string &filename, std::map<std::array<int, 2>, doub
         ame_mass_table[{Z, A}] = mass;
     }
 }
+
+struct particle
+{
+    int N, Z;
+    double px, py, pz_cms;
+    double kinergy_lab, pz_lab;
+    double theta_lab, phi;
+    void initialize(const double &betacms);
+};
 
 void particle::initialize(const double &betacms)
 {
@@ -50,13 +56,12 @@ void particle::initialize(const double &betacms)
     double gamma = 1. / TMath::Sqrt(1 - pow(betacms, 2.));
     double pmag_trans = TMath::Sqrt(pow(this->px, 2.) + pow(this->py, 2.));
     double pmag_cms = TMath::Sqrt(pow(pmag_trans, 2.) + pow(this->pz_cms, 2.));
-
     double kinergy_cms = TMath::Sqrt(pow(pmag_cms, 2.) + pow(mass, 2.)) - mass;
 
-    double pz_lab = gamma * (this->pz_cms + betacms * (kinergy_cms + mass));
-    double pmag_lab = TMath::Sqrt(pow(pmag_trans, 2.) + pow(pz_lab, 2.));
+    this->pz_lab = gamma * (this->pz_cms + betacms * (kinergy_cms + mass));
+    double pmag_lab = TMath::Sqrt(pow(pmag_trans, 2.) + pow(this->pz_lab, 2.));
 
-    this->theta_lab = TMath::ATan2(pmag_trans, pz_lab) * TMath::RadToDeg();
+    this->theta_lab = TMath::ATan2(pmag_trans, this->pz_lab) * TMath::RadToDeg();
 
     this->kinergy_lab = TMath::Sqrt(pow(pmag_lab, 2.) + pow(mass, 2.)) - mass;
     this->phi = TMath::ATan2(this->py, this->px) * TMath::RadToDeg(); // from -180 to 180 here, need to convert to uball coordinate for each ring
@@ -106,10 +111,6 @@ void correct_phi_value(particle &part, Microball *&microball)
     {
         part.phi -= 360;
     }
-}
-
-void ParsingListFile(const std::string &list_file, std::vector<std::string> &input_files)
-{
 }
 
 class ArgumentParser
