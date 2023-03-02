@@ -1,4 +1,5 @@
 #include "Physics.cpp"
+#include "ProgressBar.cpp"
 
 #include <array>
 #include <vector>
@@ -109,8 +110,6 @@ void particle::initialize(const double &betacms, const double &beam_rapidity)
     this->phi = TMath::ATan2(this->py, this->px) * TMath::RadToDeg();
     this->rapidity_lab = Physics::GetRapidity(this->kinergy_lab, this->pz, mass);
     this->rapidity_lab_normed = this->rapidity_lab / beam_rapidity;
-
-    std::cout << "pz: " << pz << std::endl;
 }
 
 class ArgumentParser

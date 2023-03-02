@@ -71,6 +71,7 @@ void analyze_table3(TChain *&chain, Histograms *&hist, const ArgumentParser &arg
     double norm = 0.;
     double norm_one_decay = 0.;
 
+    ProgressBar bar(nevents, argparser.reaction);
     for (int ievt = 0; ievt < nevents; ievt++)
     {
         chain->GetEntry(ievt);
@@ -90,6 +91,7 @@ void analyze_table3(TChain *&chain, Histograms *&hist, const ArgumentParser &arg
         }
         else
         {
+            bar.Update();
             continue;
         }
 
@@ -103,6 +105,7 @@ void analyze_table3(TChain *&chain, Histograms *&hist, const ArgumentParser &arg
             }
             hist->fill(particle, 1. / NDECAYS);
         }
+        bar.Update();
     }
     hist->normalize(norm);
     hist_one_decay->normalize(norm_one_decay);
@@ -117,6 +120,7 @@ void analyze_table21(TChain *&chain, Histograms *&hist, const ArgumentParser &ar
     int nevents = chain->GetEntries();
     double norm = 0.;
 
+    ProgressBar bar(nevents, argparser.reaction);
     for (int ievt = 0; ievt < nevents; ievt++)
     {
         chain->GetEntry(ievt);
@@ -127,6 +131,7 @@ void analyze_table21(TChain *&chain, Histograms *&hist, const ArgumentParser &ar
         }
         else
         {
+            bar.Update();
             continue;
         }
 
@@ -136,6 +141,7 @@ void analyze_table21(TChain *&chain, Histograms *&hist, const ArgumentParser &ar
             particle.initialize(betacms, beam_rapidity);
             hist->fill(particle, 1.);
         }
+        bar.Update();
     }
     hist->normalize(norm);
 }
