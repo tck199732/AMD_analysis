@@ -11,7 +11,23 @@ class Coalescence:
 
     @staticmethod
     def pseudo_neutron(proton, triton, helium3, bins=30, range=(0,600)):
-        
+        """ Construct spectra of pseudo-neutron from proton, triton, and helium3 spectra.
+        Parameters
+        ----------
+        proton : pandas.DataFrame
+            Proton spectra
+        triton : pandas.DataFrame
+            Triton spectra
+        helium3 : pandas.DataFrame  
+            Helium3 spectra
+        bins : int, optional
+            Number of bins, by default 30
+        range : tuple, optional 
+            Range of spectra, by default (0,600)
+        Returns
+        -------
+        pandas.DataFrame
+        """
         proton_spectra = df_helper.rebin1d(proton, bins=bins, range=range)
         triton_spectra = df_helper.rebin1d(triton, bins=bins, range=range)
         helium3_spectra = df_helper.rebin1d(helium3, bins=bins, range=range)
@@ -50,10 +66,21 @@ class Coalescence:
 
     @staticmethod
     def coalescence_spectra(spectra, type:Literal['p','n']='p', range=(0, 600), bins=30):
-        """
+        """ Construct coalescence spectra from a dictionary of spectra.
+        Parameters
+        ----------
         spectra : dict
             `key = (Z,N)` 
             `value` = pd.DataFrame
+        type : Literal['p','n'], optional
+            Type of coalescence spectra, by default 'p'
+        range : tuple, optional
+            Range of spectra, by default (0, 600)
+        bins : int, optional    
+            Number of bins, by default 30
+        Returns
+        -------
+        pandas.DataFrame
         """
 
         rebinned_spectra = dict()
