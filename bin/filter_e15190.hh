@@ -171,6 +171,7 @@ public:
             case 'h':
             {
                 this->help();
+                std::exit(1);
             }
             default:
             {
