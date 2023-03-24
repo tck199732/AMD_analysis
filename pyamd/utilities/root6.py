@@ -345,3 +345,25 @@ class HistogramReader:
         xbin2 = GetAxis().FindBin(range[1])
 
         return getattr(hist, f'Projection{axis.upper()}')(name, xbin1, xbin2)
+
+    def df_to_hist1d(self, df, name, range, bins):
+        """ convert a pd.DataFrame to ROOT.TH1D
+        Parameters
+        ----------
+        df : pd.DataFrame
+            must have columns `x`, `content`, `error`
+        name : str
+            name of the histogram
+        range : tuple
+            range of the histogram
+        bins : int
+            number of bins
+        Returns
+        ------- 
+        ROOT.TH1D
+        """
+        h = ROOT.TH1D(name, '', bins, *range)
+        for i in range(bins):
+            h.SetBinContent(i+1, df['content'].iloc[i])
+            h.SetBinError(i+1, df['error'].iloc[i])
+        return h
