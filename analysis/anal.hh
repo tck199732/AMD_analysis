@@ -165,10 +165,12 @@ public:
             }
             case 'i':
             {
-                this->input_files.push_back(optarg);
-                while (optind < argc && *argv[optind] != '-')
+                // split optarg by space
+                std::istringstream iss(optarg);
+                std::string token;
+                while (std::getline(iss, token, ' '))
                 {
-                    this->input_files.push_back(argv[optind++]);
+                    this->input_files.push_back(token);
                 }
                 break;
             }
@@ -213,6 +215,15 @@ public:
         {
             std::cout << "Table 21 is not available for filtered mode." << std::endl;
             exit(1);
+        }
+
+        for (auto f : this->input_files)
+        {
+            if (!fs::exists(f))
+            {
+                std::cerr << "File " << f.c_str() << " does not exist." << std::endl;
+                std::exit(1);
+            }
         }
     }
     void help()
