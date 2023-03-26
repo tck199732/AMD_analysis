@@ -50,7 +50,7 @@ class Isoscaling:
         def cost_fcn(norm, alpha, beta):
             d2 = (X[1] - Isoscaling.model(*(np.array(list(X[0])).transpose()), norm, alpha, beta)) ** 2
             e2 = X[2] ** 2
-            return np.sum(np.divide(d2, e2, where=(e2!=0.)))
+            return np.sum(np.divide(d2, e2, where=(e2 != 0.), out=np.zeros_like(d2)))
         
         minuit = iminuit.Minuit(cost_fcn, norm=init_norm, alpha=init_alpha, beta=init_beta)
 
