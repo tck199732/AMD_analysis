@@ -151,7 +151,7 @@ Histograms::Histograms(const std::string &suffix)
     for (const auto &pn : this->PARTICLENAMES)
     {
         std::string hname = Form("h2_pt_rapidity_%s_%s", suffix.c_str(), pn.c_str());
-        this->h2_pta_rapidity_lab[pn] = new TH2D(hname.c_str(), "", 100, 0., 1., 800, 0, 800);
+        this->h2_pta_rapidity_lab[pn] = new TH2D(hname.c_str(), "", 200, -1., 1., 800, 0, 800);
         this->h2_pta_rapidity_lab[pn]->Sumw2();
         this->h2_pta_rapidity_lab[pn]->SetDirectory(0);
     }
