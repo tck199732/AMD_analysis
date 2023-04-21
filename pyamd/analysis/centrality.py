@@ -1,6 +1,3 @@
-# plotting
-import matplotlib.pyplot as plt
-
 # I/O
 import pathlib
 import warnings
@@ -13,28 +10,24 @@ from iminuit import Minuit
 from iminuit.cost import LeastSquares
 from scipy.optimize import curve_fit
 
-# miscellaneous
-from copy import copy
-from functools import cache
-
 # local
-from pyamd import PROJECT_DIR
-from pyamd.utilities import dataframe, minuit, root6, symwrap
+from pyamd.utilities import minuit, root6, symwrap, histo
 
 hist_reader = root6.HistogramReader()
-df_helper = dataframe.DataFrameHelper()
-
+# alias
+dfhist = histo.histogram
 
 class Multiplicity_ImpactParameter:
-    def __init__(self, path=None, histname='h2_multi_b', **kwargs):
-            #  skyrme='SkM', table='3', mode='filtered'):
+    def __init__(self, path, histname='h2_multi_b', **kwargs):
         """ A Class handle calculation from 2D histogram Impact-Parameter VS Multiplicity
         Parameter
         ---------
         path : str, pathlib.Path
-            if None, use the default path
+            path to the root file containing the histogram of impact-parameter vs multiplicity
         histname : str
             name of the TH2D in the root file
+        kwargs : dict
+            additional information about the histogram in the root file
         """
 
         attributes = ['reaction', 'mode', 'table', 'skyrme', 'impact_parameter']
@@ -50,85 +43,57 @@ class Multiplicity_ImpactParameter:
                     f'hist name {histname} not found in root file. We will use the first object in the file, i.e. `{objname}`')
                 hist = file[objname]
             
+            # number of events used in the histogram (after filtering)
             self.nentries = hist.GetEntries()
+            # number of events in simulation (used as normalization factor)
+            self.integral = self.nentries / hist.Integral()
+
             self.bins = (hist.GetNbinsX(), hist.GetNbinsY())
             self.binwidths = (hist.GetXaxis().GetBinWidth(1), hist.GetYaxis().GetBinWidth(1))
             self.xrange = (hist.GetXaxis().GetXmin(), hist.GetXaxis().GetXmax())
             self.yrange = (hist.GetYaxis().GetXmin(), hist.GetYaxis().GetXmax())
             self.df = hist_reader.hist2d_to_df(hist)
 
-    def MultiplicitySpectra(self, range=(-0.5, 24.5), cut=(0., 10.), bins=25, normalize=True):
-        """ Projection to get multiplicity spectra
-        Parameter
-        ---------
+    def get_multiplicity_distribution(self, range=(-0.5, 79.5), cut=(0,10), bins=None, normalize=True):
+        """ Projection to get multiplicity distribution
+        Parameters
+        ----------
         range : tuple of float
-            range of multiplicity
+            range of multiplicity to be included in the final spectra
         cut : tuple of float
             cut on impact-parameter
         bins : int
-            number of bins
+            number of bins, if None, use 1 bin for each multiplicity
         normalize : bool
             if True, normalize by bin width
-        """
-        df = self.df.copy()
-        binwidth = np.diff(df['y'][0:2])
-        cut1 = cut[0] - binwidth/2.
-        cut2 = cut[1] + binwidth/2.
+        Return  
+        ------
+        pd.DataFrame
+            dataframe containing the multiplicity distribution, with columns `x`, `y`, `y_err`, `y_ferr`
+        """ 
+        bins = int(np.diff(range)[0]) if bins is None else bins
+        return dfhist.projection(self.df, cut=cut, range=range, bins=bins, axis='x', normalize=normalize)
 
-        df.query('z > 0 ', inplace=True)
-        df.query(f'y >= {float(cut1)} & y < {float(cut2)}', inplace=True)
-
-        hist, bin_edges = np.histogram(
-            df['x'], weights=df['z'], range=range, bins=bins)
-        hist_err, bin_edges = np.histogram(
-            df['x'], weights=df['z_err']**2, range=range, bins=bins)
-        hist_err = np.sqrt(hist_err)
-
-        # normalization
-        dM = np.diff(range)/bins
-        norm = np.abs(dM) if normalize else 1.
-
-        return pd.DataFrame({
-            'x': 0.5 * (bin_edges[1:] + bin_edges[:-1]),
-            'y': hist / norm,
-            'y_err': hist_err / norm,
-            'y_ferr': np.divide(hist_err, hist, out=np.zeros_like(hist_err), where=(hist > 0.0))
-        })
-
-    def ImpactParameterSpectra(self, range=(0., 10.), cut=(-0.5, 24.5), bins=20, normalize=False):
-        """ Projection to get impact-parameter spectra
+    def get_impact_parameter_distribution(self, range=(0., 10.), cut=(-0.5, 79.5), bins=100, normalize=True):
+        """ get impact-parameter distribution 
         Parameter
         ---------
         range : tuple of float 
             range of b
-        cut : tuple of float 
-            cut on multiplity
-        bins : int
+        cut : tuple of float
+            cut on multiplicity
+        bins : int  
             number of bins
-        normalize : bool
+        normalize : bool    
             if True, normalize by bin width
+        Return
+        ------
+        pd.DataFrame
+            dataframe containing the impact-parameter distribution, with columns `x`, `y`, `y_err`, `y_ferr`
         """
-        df = self.df.copy()
-        df.query(f'x >= {cut[0]} & x <= {cut[1]}', inplace=True)
-
-        hist, bin_edges = np.histogram(
-            df['y'], weights=df['z'], range=range, bins=bins)
-        hist_err, bin_edges = np.histogram(
-            df['y'], weights=df['z_err']**2, range=range, bins=bins)
-        hist_err = np.sqrt(hist_err)
-
-        # normalization
-        db = np.diff(range)/bins
-        norm = np.abs(db) if normalize else 1.
-
-        return pd.DataFrame({
-            'x': 0.5 * (bin_edges[1:] + bin_edges[:-1]),
-            'y': hist / norm,
-            'y_err': hist_err / norm,
-            'y_ferr': np.divide(hist_err, hist, out=np.zeros_like(hist_err), where=(hist > 0.0))
-        })
-
-    def DifferentialCrossSection(self, range=(0., 10.), cut=(-0.5, 24.5), bins=20, unit=None):
+        return dfhist.projection(self.df, cut=cut, range=range, bins=bins, axis='y', normalize=normalize)
+    
+    def get_dsigma_db(self, range=(0., 10.), cut=(-0.5, 79.5), bins=20, unit=None):
         """ Obtain differential cross section :math: `d\sigma/db`. Note that we assume the input histogram is normalized by **`pure simulation events`** not **`filtered events`**.
         Parameter
         ---------
@@ -143,8 +108,8 @@ class Multiplicity_ImpactParameter:
             `b` : barn
             `mb` : 0.1 barn
         """
-        # normalized impact parameter spectra dM/db
-        df = self.ImpactParameterSpectra(
+        # normalized impact parameter spectra (1 / N_{simulation}) dN/db
+        df = self.get_impact_parameter_distribution(
             range=range, cut=cut, bins=bins, normalize=True)
 
         # first get total cross section \pi bmax^2 (fm^2)
@@ -160,16 +125,15 @@ class Multiplicity_ImpactParameter:
         dsigma_db = cs.value * df.y
         error = cs.value * df['y_err']
 
-        df = pd.DataFrame({
+        return pd.DataFrame({
             'x': df.x,
             'y': dsigma_db,
-            'y_err': error
+            'y_err': error,
+            'y_ferr': np.divide(error, dsigma_db, out=np.zeros_like(error), where=(dsigma_db > 0.0))
         })
-        df_helper.calculate_relative_error(df)
-        return df
-
-    def CrossSection(self, range=(0., 10.), cut=(-0.5, 24.5), bins=20, unit=None):
-        """ Integrate :math: `d\sigma/db` to get :math: `\sigma`
+        
+    def get_sigma_b(self, range=(0., 10.), cut=(-0.5, 24.5), bins=20, unit=None):
+        """ Integrate :math: `d\sigma/db` to get :math: `\sigma_b`
         range : tuple of float
             range of b
         cut : tuple of float
@@ -181,51 +145,85 @@ class Multiplicity_ImpactParameter:
             `b` : barn
             `mb` : 0.1 barn
         """
-        df = self.DifferentialCrossSection(
-            range, cut, bins, unit)  # full range
-        db = np.diff(df.x[0:2])
+        df = self.get_dsigma_db(range, cut, bins, unit)
+        db = df['x'][1] - df['x'][0]
         return np.sum(df['y']) * db, np.sqrt(np.sum(df['y_err'])) * db
 
-    def BmaxFromCrossSection(self, range=(0., 10.), cut=(-0.5, 24.5), bins=20, unit=None):
-        sig, err = self.CrossSection(range, cut, bins, unit)
-        return np.sqrt(sig / np.pi), err / 2. / np.sqrt(np.pi * sig)
+    @staticmethod
+    def _get_b_from_sigma(sigma):
+        return np.sqrt(sigma / np.pi)
 
-    def Mapping(self, ranges=[[-0.5, 24.5], [0., 10.]], bins=[25, 20], unit=None):
-        """ Calculate the mapping from charged-particle multiplicty to Impact-Parameter
-        Parameter
-        ---------
-        range: 
-            range of multiplicty (0) and b (1)
-        bins:
-            bins of multiplicty (0) and b (1) 
-        unit:
-            unit of impact-parameter
-            `None` : fm
+    def get_bmax(self, range=(0., 10.), cut=(-0.5, 24.5), bins=20, unit=None):
+        sig, err = self.get_sigma_b(range, cut, bins, unit)
+        return Multiplicity_ImpactParameter._get_b_from_sigma(sig), np.divide(err / 2., np.sqrt(np.pi * sig), out=np.zeros_like(err), where=(sig > 0.0))
+
+    def get_cummulative_multiplicity_distribution(self, ranges=[-0.5,24.5], cut=[0.,10.], bins=None):
+        """ Get cummulative multiplicity distribution 
+        Parameters
+        ----------
+        ranges : list of float
+            range of multiplicity to be included in the final spectra
+        cut : list of float
+            cut on impact-parameter                             
+        bins : int
+            number of bins, if None, use 1 bin for each multiplicity
+        Return
+        ------
+        pd.DataFrame
+            dataframe containing the cummulative multiplicity distribution, with columns `x`, `y`, `y_err`, `y_ferr`
         """
-        df = self.MultiplicitySpectra(
-            range=ranges[0], cut=ranges[1], bins=bins[0])
+        bins = int(np.round(np.diff(ranges))) if bins is None else bins
+        df = self.get_multiplicity_distribution(range=ranges, cut=cut, bins=bins)
 
-        # in case the spectra isn't normalized
-        df['y'] /= np.sum(df['y'])
-        df['y_err'] /= np.sum(df['y'])
+        
+        P = np.cumsum(df['y'][::-1])[::-1]
+        P_err = np.sqrt(np.cumsum(df['y_err'][::-1]**2))[::-1]
 
-        bmax, bmax_err = self.BmaxFromCrossSection(
-            range=ranges[1], cut=ranges[0], bins=bins[1], unit=unit)
+        P /= P[0]
+        P_ferr = np.divide(P_err, P, out=np.zeros_like(P_err), where=(P!=0.))
+        P_err  = P * np.sqrt( P_ferr ** 2. + (df['y_err'][0] / df['y'][0])**2)
 
-        y = bmax * np.sqrt(1. - np.cumsum(df['y']))
-        yerr = np.sqrt(
-            (0.5 * bmax**2 / y * np.sqrt(np.cumsum(df['y_err']**2))) ** 2. +
-            (bmax_err * y / bmax) ** 2.
-        )
-
-        df = pd.DataFrame({
-            'x': df.x.to_numpy(),
-            'y': y,
-            'y_err': yerr,
+        return pd.DataFrame({
+            'x' : df['x'],
+            'y' : P,
+            'y_err' : P_err,
+            'y_ferr' : np.divide(P_err, P, out=np.zeros_like(P_err), where=(P!=0.))
         })
 
-        df_helper.calculate_relative_error(df, inplace=True)
-        return df
+    def get_bijective_map(self, ranges=[[-0.5, 24.5], [0., 10.]], bins=[None, 20], unit=None):
+        """ Calculate the mapping from charged-particle multiplicty to Impact-Parameter
+        Parameters
+        ----------
+        ranges : list of tuple of float
+            range of multiplicity and impact-parameter
+        bins : list of int  
+            number of bins for multiplicity and impact-parameter
+        unit : str  
+            `None` : use the same unit as in simulation, i.e. fm^2
+            `b` : barn  
+            `mb` : 0.1 barn
+        Return  
+        ------
+        pd.DataFrame
+            dataframe containing the bijective map, with columns `x`, `y`, `y_err`, `y_ferr
+        """
+        PNC = self.get_cummulative_multiplicity_distribution(ranges=ranges[0], cut=ranges[1], bins=bins[0])
+
+        bmax, bmax_err = self.get_bmax(
+            range=ranges[1], cut=ranges[0], bins=bins[1], unit=unit)
+
+        y = bmax * np.sqrt(PNC['y'])
+        yerr = np.sqrt(
+            PNC['y'] * bmax_err ** 2 + \
+            (0.5 * bmax * PNC['y_ferr']) ** 2.
+        )
+
+        return pd.DataFrame({
+            'x': PNC['x'].to_numpy(),
+            'y': y,
+            'y_err': yerr,
+            'y_ferr': np.divide(yerr, y, out=np.zeros_like(yerr), where=(y > 0.0))
+        }).query('y != 0.0 and y_ferr != 0.0')
 
     @staticmethod
     def create_model_dsigma_db():
@@ -251,11 +249,12 @@ class Multiplicity_ImpactParameter:
 
     def fit_dsigma_db_iminuit(self, df=None, range=(0., 10.), bins=20, unit=None, verbose=1, output_info=False):
         if df is None:
-            df = self.DifferentialCrossSection(
+            df = self.get_dsigma_db(
                 range=range, bins=bins, unit=None)
 
         cost_fcn = LeastSquares(
-            df.x, df.y, df['y_err'], Multiplicity_ImpactParameter.model_dsigma_db)
+            df['x'], df['y'], df['y_err'], Multiplicity_ImpactParameter.model_dsigma_db)
+
         m = Minuit(cost_fcn, norm=2.*np.pi, b0=9., db=0.1)
         m.migrad()
         m.hesse()
@@ -296,16 +295,16 @@ class Multiplicity_ImpactParameter:
         df = pd.DataFrame({
             'x': x,
             'y': y.value,
-            'y_err': yerr.value
+            'y_err': yerr.value,
+            'y_ferr': np.divide(yerr.value, y.value, out=np.zeros_like(yerr.value), where=(y.value > 0.0))
         })
-        df_helper.calculate_relative_error(df)
 
         if output_info:
             return df, fit_info
         return df
 
     def fit_dsigma_db_TMinuit(self, df=None, range=(0., 10.), bins=20, unit=None):
-        """ Fit the differential cross-section using TMinuit.
+        """ Fit the differential cross-section using TMinuit. This function is kept for legacy purpose, use `fit_dsigma_db_iminuit` instead.
         Parameter
         ---------
         df : pd.DataFrame
@@ -319,7 +318,7 @@ class Multiplicity_ImpactParameter:
             `mb` : 1e-1 barn
         """
         if df is None:
-            df = self.DifferentialCrossSection(
+            df = self.get_dsigma_db(
                 range=range, bins=bins, unit=None)
         global fcn
         global xarray
@@ -366,95 +365,5 @@ class Multiplicity_ImpactParameter:
             'x': x,
             'y': y.value,
             'y_err': yerr.value,
-            'y_ferr': 0.
+            'y_ferr': np.divide(yerr.value, y.value, out=np.zeros_like(yerr.value), where=(y.value > 0.0))
         })
-
-    def plot_multiplicity(self, ax=None, range=(-0.5, 24.5), cut=(0., 10.), bins=25, **kwargs):
-        df = self.MultiplicitySpectra(range=range, bins=bins, cut=cut)
-        kw = dict(fmt='.')
-        kw.update(kwargs)
-        return df_helper.plot1d(ax, df, **kw)
-
-    def plot_impact_parameter(self, ax=None, range=(0., 10.), cut=(-0.5, 24.5), bins=20, **kwargs):
-        df = self.ImpactParameterSpectra(range=range, bins=bins, cut=cut)
-        kw = dict(
-            fmt='.',
-        )
-        kw.update(kwargs)
-        return df_helper.plot1d(ax, df, **kw)
-
-    def plot2d(self, ax=None, df=None, cmap='jet', drop_zeros=True, **kwargs):
-        if df is None:
-            df = self.df.copy()
-
-        if drop_zeros:
-            df = df.query(f'z > 0.0')
-
-        if ax is None:
-            ax = plt.gca()
-
-        cmap = copy(plt.cm.get_cmap(cmap))
-        cmap.set_under('white')
-
-        kw = dict(
-            cmap=cmap,
-            range=[[-0.5, 24.5], [0., 10.]],
-            bins=[25, 100]
-        )
-        kw.update(kwargs)
-
-        return ax.hist2d(df['x'], df['y'], weights=df['z'], **kw)
-
-    def fit1d(self, df):
-
-        def model(x, norm, mean, sigma):
-            return norm * np.exp(-(x-mean)**2 / 2. / sigma**2)
-
-        df = df.query('y > 0. & y_err > 0.')
-
-        par, cov = curve_fit(
-            # lambda x, *par : model(x, *par),
-            model,
-            df.x.to_numpy(),
-            df.y.to_numpy(),
-            sigma=df['y_err'].to_numpy(),
-            absolute_sigma=True
-        )
-        err = np.sqrt(np.diag(cov))
-        return par, err
-
-    def plotfit(self, ax=None, df=None, range=(-0.5, 24.5), bins=25., **kwargs):
-
-        par, err = self.fit1d(df)
-        x = np.linspace(*range, bins+1)
-        norm, mean, sigma = par
-        norm_err, mean_err, sigma_err = err
-        y = norm * np.exp(-(x-mean)**2 / 2. / sigma**2)
-        yerr = 0.
-        kw = dict(fmt='--')
-        kw.update(kwargs)
-
-        df = pd.DataFrame({
-            'x': x,
-            'y': y,
-            'y_err': yerr,
-            'y_ferr': 0.
-            # 'y_ferr': np.divide(yerr, y, where=(y != 0.0), out=np.zeros_like(yerr))
-        })
-        return df_helper.plot1d(ax, df, **kw)
-
-    def plot_fitted_multiplicity(self, ax=None, df=None, cut=(0., 10.), range=(-0.5, 24.5), bins=25, **kwargs):
-
-        if df is None:
-            df = self.MultiplicitySpectra(cut=cut, range=range, bins=bins)
-        kw = dict(fmt='--')
-        kw.update(kwargs)
-        return self.plotfit(ax, df, range=range, bins=bins, **kw)
-
-    def plot_fitted_impact_parameter(self, ax=None, df=None, cut=(1, 25), range=(0., 10.), bins=20, **kwargs):
-        if df is None:
-            df = self.ImpactParameterSpectra(
-                cut=cut, range=range, bins=bins)
-        kw = dict(fmt='--')
-        kw.update(kwargs)
-        return self.plotfit(ax, df, range=range, bins=bins, **kw)
