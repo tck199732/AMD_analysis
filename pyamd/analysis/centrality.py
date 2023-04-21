@@ -15,7 +15,7 @@ from pyamd.utilities import minuit, root6, symwrap, histo
 
 hist_reader = root6.HistogramReader()
 # alias
-dfhist = histo.histogram
+dfhist = histo.histogram_handler
 
 class Multiplicity_ImpactParameter:
     def __init__(self, path, histname='h2_multi_b', **kwargs):
