@@ -39,7 +39,7 @@ class histogram_handler:
         if cut is not None:
             bw = df[cut_axis][1] - df[cut_axis][0]
             cut = (cut[0] - bw/2, cut[1] + bw/2)
-            df.query(f'{cut_axis} >= {cut[0]} & {cut_axis} < {cut[1]}', inplace=True)
+            df.query(f'{cut_axis} > {cut[0]} & {cut_axis} < {cut[1]}', inplace=True)
 
         range = (df[axis].min(), df[axis].max()) if range is None else range
         bins = df.shape[0] if bins is None else bins
@@ -66,6 +66,18 @@ class histogram_handler:
             'y_err' : histerr / norm,
             'y_ferr' : np.divide(histerr, hist, out=np.zeros_like(hist), where=hist!=0)
         })
+
+    @staticmethod
+    def query(df, xrange, yrange=None):
+        df = df.copy()
+        xbw = np.diff(xrange)[0] / df.shape[0]
+        xrange = (xrange[0] - xbw/2, xrange[1] + xbw/2)
+        df.query(f'x > {xrange[0]} & x < {xrange[1]}', inplace=True)
+        if yrange is not None:
+            ybw = np.diff(yrange)[0] / df.shape[1]
+            yrange = (yrange[0] - ybw/2, yrange[1] + ybw/2)
+            df.query(f'y > {yrange[0]} & y < {yrange[1]}', inplace=True)
+        return df
 
     @staticmethod
     def rebin1D(df, range, bins=None, normalize=True):
@@ -198,8 +210,8 @@ class histogram_handler:
     
     @staticmethod
     def add(a, b, axis='y'):
-        return histogram.sum(a, b, axis, sign=1.)
+        return histogram_handler.sum(a, b, axis, sign=1.)
     
     @staticmethod
     def sub(a, b, axis='y'):
-        return histogram.sum(a, b, axis, sign=-1.)
+        return histogram_handler.sum(a, b, axis, sign=-1.)
