@@ -106,7 +106,7 @@ class CollisionReaction:
         beam_energy_tot = beam_ke + beam_mass
         mom_beam = np.sqrt(beam_ke ** 2 + 2 * beam_ke * beam_mass)
         gamma = beam_energy_tot / beam_mass
-        return mom_beam / (gamma * beam_mass + target_mass)
+        return (mom_beam / (gamma * beam_mass + target_mass)).value
 
     @staticmethod
     def get_rapidity_beam(reaction):
@@ -115,7 +115,7 @@ class CollisionReaction:
         beam_ke = d['beam_energy'] * d['beamA'] * units.MeV
 
         mom_beam = np.sqrt(beam_ke ** 2 + 2 * beam_ke * beam_mass)
-        return 0.5 * np.log((beam_ke + beam_mass + mom_beam) / (beam_ke + beam_mass - mom_beam))
+        return 0.5 * np.log((beam_ke + beam_mass + mom_beam) / (beam_ke + beam_mass - mom_beam)).value
 
     @staticmethod
     def get_rapidity_beam_and_target(reaction):
@@ -127,7 +127,7 @@ class CollisionReaction:
 
         target_mass = ame_table.get_mass(d['target'] + str(d['targetA']))
         
-        return 0.5 * np.log((beam_ke + beam_mass + target_mass + mom_beam) / (beam_ke + beam_mass + target_mass - mom_beam))
+        return (0.5 * np.log((beam_ke + beam_mass + target_mass + mom_beam) / (beam_ke + beam_mass + target_mass - mom_beam))).value
 
         
 
