@@ -62,6 +62,7 @@ class PtRapidityLAB:
                 hist = file[objname]
 
             self.nentries = hist.GetEntries()
+            self.integral = hist.Integral()
             self.bins = (hist.GetNbinsX(), hist.GetNbinsY())
             self.binwidths = (hist.GetXaxis().GetBinWidth(1), hist.GetYaxis().GetBinWidth(1))
             self.xrange = (hist.GetXaxis().GetXmin(), hist.GetXaxis().GetXmax())
@@ -155,54 +156,6 @@ class PtRapidityLAB:
         return pd.DataFrame({
             'x': theta_cms,
             'y': kinergy_cms_per_A,
-            'z': df['z'],
-            'z_err': df['z_err'],
-            'z_ferr': df['z_ferr']
-        })
-
-    def get_pmag_rapidity_CMS(self, xrange=(0.4, 0.6), yrange=(0., 600.), correct_coverage=False, **kwargs):
-        """ Get the 2D histogram momentum magnitude versus rapidity in CMS
-        Parameters
-        ----------
-        xrange : tuple, optional
-            x range, by default (0.4, 0.6)
-        yrange : tuple, optional
-            y range, by default (0., 600.)
-        correct_coverage : bool, optional       
-            apply coverage correction, by default False
-        **kwargs : dict 
-            keyword arguments for `correct_coverage`
-        Returns
-        -------
-        pandas.DataFrame    
-            momentum magnitude versus rapidity in CMS
-        """
-        df = self._apply_coverage_correction(xrange=xrange, yrange=yrange, **kwargs) if correct_coverage else self.df
-        
-        #alias
-        mass = self.particle.mass
-
-        # randomize each bin
-        rng = np.random.default_rng(seed=kwargs.get('seed', 0))
-        x = df['x'].to_numpy() + self.binwidths[0] * rng.uniform(-0.5, 0.5, size=df.shape[0])
-        y = df['y'].to_numpy() + self.binwidths[1] * rng.uniform(-0.5, 0.5, size=df.shape[0])
-
-        # get reaction constants
-        beam_rapidity = e15190.CollisionReaction.get_rapidity_beam(self.reaction)
-        beta_cms = e15190.CollisionReaction.get_betacms(self.reaction)
-
-        rapidity_cms = x * beam_rapidity
-        rapidity_cms -= 0.5 * np.log((1 + beta_cms) / (1 - beta_cms))
-        pt = y * (self.particle.N + self.particle.Z)
-        
-        # calculate pz and theta in CMS
-        pz_cms = pt * np.sinh(rapidity_cms)
-        pmag_cms = np.sqrt(pt**2 + pz_cms**2)
-        pmag_cms_per_A = pmag_cms / (self.particle.N + self.particle.Z)
-
-        return pd.DataFrame({
-            'x': rapidity_cms,
-            'y': pmag_cms_per_A,
             'z': df['z'],
             'z_err': df['z_err'],
             'z_ferr': df['z_ferr']
