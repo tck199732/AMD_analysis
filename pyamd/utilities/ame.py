@@ -68,6 +68,7 @@ class AME:
 
         # fortranformat does not handle '*'
         lines = [re.sub('[*]', ' ', line) for line in lines]  
+
         # avoid unit change in fortranformat
         lines = [re.sub('[#]', '.', line) for line in lines]  
 
@@ -82,17 +83,21 @@ class AME:
         df['Z'] = df['Z'].astype(int)
         df['A'] = df['A'].astype(int)
 
-        df['mass'] = (df['A'] + df['atomic_mass_au'] * units.micron.to('m', 1.)) * (units.u * constants.c ** 2).to('MeV')
-        df['mass_err'] = df['atomic_mass_err'] * units.micron.to('m', 1.) * (units.u * constants.c ** 2).to('MeV')
+        # change of units
+
+        df['mass_excess'] = df['mass_excess'] * units.keV.to('MeV', 1.)
+        df['mass_excess_err'] = df['mass_excess_err'] * units.keV.to('MeV', 1.)
+
+        df['au'] = df['A'] + df['atomic_mass_au'] * units.micron.to('m', 1.)
+        df['au_err'] = df['atomic_mass_err'] * units.micron.to('m', 1.)
+
+        df['mass'] = df['au'] * (units.u * constants.c ** 2).to('MeV')
+        df['mass_err'] = df['au_err'] * (units.u * constants.c ** 2).to('MeV')
 
         df['binding_energy_per_nucleon'] = df['binding_energy_per_nucleon'] * units.keV.to('MeV', 1.)
         df['binding_energy_per_nucleon_err'] = df['binding_energy_per_nucleon_err'] * units.keV.to('MeV', 1.)
 
-        df.drop(columns=['1', 'N-Z', 'O', 'B-', 'A', 'EL', 'au', 'atomic_mass_au', 'atomic_mass_err'], inplace=True)
-
-
-        
-
+        df.drop(columns=['1', 'N-Z', 'O', 'B-', 'EL', 'atomic_mass_au', 'atomic_mass_err'], inplace=True)
 
         self.df = df
 
@@ -124,7 +129,7 @@ class AME:
     def get_binding_energy(self, symbol=None, N=None, Z=None, unit='MeV'):
         return self._get_row(symbol, N, Z)['binding_energy_per_nucleon'].values[0] * units.MeV.to(unit)
     
-    def get_mass_data(self, fname='ame_mass.txt', usecols=['Z', 'A', 'mass', 'binding_energy_per_nucleon']):
+    def get_mass_data(self, fname='ame_mass.txt', usecols=['symbol', 'Z', 'A', 'mass', 'binding_energy_per_nucleon']):
         """ Output the mass table to a format convenient for reading in C++.
         Parameters
         ----------
