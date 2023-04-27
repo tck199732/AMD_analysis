@@ -26,100 +26,117 @@ class AME:
 
         self._read()
 
+
     def _read(self):
         with open(str(self.dl_path), 'r') as file:
             lines = file.readlines()
 
-        capture_format = False
-        counter_0 = 0
-        for i, line in enumerate(lines):
+        for line in lines:
             if 'format' in line:
-                if capture_format is False:
-                    format = line.split(':')[1].strip()
-                    capture_format = True
-            if line.startswith('0'):
-                counter_0 += 1
-            if counter_0 == 3:
+                format = line.split(':')[1].strip()
                 break
+        for i, line in enumerate(lines):
+            if 'keV' in line:
+                break
+        lines = lines[i+1:]
+        format = '(' + format + ')'
 
-        lines = lines[i:]
+        freader = ff.FortranRecordReader(format)
 
-        self.format = f'({format})'
-        freader = ff.FortranRecordReader(self.format)
-
-        columns_names = {
-            2: 'N',
-            3: 'Z',
-            4: 'A',
-            5: 'symbol',
-            7: 'mass_excess',
-            8: 'mass_excess_err',
-            15: 'atomic_mass',
-            16: 'atomic_mass_err',
-        }
+        columns_names = [
+            '1',
+            'N-Z',
+            'N',
+            'Z',
+            'A',
+            'EL',
+            'O',
+            'mass_excess',
+            'mass_excess_err',
+            'binding_energy_per_nucleon',
+            'binding_energy_per_nucleon_err',
+            'B-',
+            'beta_decay_energy',
+            'beta_decay_energy_err',
+            'au',
+            'atomic_mass_au',
+            'atomic_mass_err',
+        ]
 
         # '#' means estimated value (non-experimental)
         # '*' means unable to calculate
-        lines = [re.sub('[*]', ' ', line)
-                 for line in lines]  # fortranformat does not handle '*'
-        lines = [re.sub('[#]', '.', line)
-                 for line in lines]  # avoid unit change in fortranformat
-        lines = [freader.read(line) for line in lines]
-        for i, line in enumerate(lines):
-            lines[i] = [line[id] for id in columns_names]
 
-        df = pd.DataFrame(lines, columns=columns_names.values())
+        # fortranformat does not handle '*'
+        lines = [re.sub('[*]', ' ', line) for line in lines]  
+        # avoid unit change in fortranformat
+        lines = [re.sub('[#]', '.', line) for line in lines]  
+
+        lines = [freader.read(line) for line in lines]
+        
+        df = pd.DataFrame(lines, columns=columns_names)
+
+        df['symbol'] = list(map(lambda s: s.lower().strip(), df['EL']))
+        df['symbol'] = df['symbol'] + df['A'].astype(str)
+
         df['N'] = df['N'].astype(int)
         df['Z'] = df['Z'].astype(int)
         df['A'] = df['A'].astype(int)
 
-        df['symbol'] = list(map(lambda s: s.lower().strip(), df['symbol']))
-        df['symbol'] = df['symbol'] + df['A'].astype(str)
+        df['mass'] = (df['A'] + df['atomic_mass_au'] * units.micron.to('m', 1.)) * (units.u * constants.c ** 2).to('MeV')
+        df['mass_err'] = df['atomic_mass_err'] * units.micron.to('m', 1.) * (units.u * constants.c ** 2).to('MeV')
 
-        df['atomic_mass'] = df['A'] + \
-            df['atomic_mass'] * units.micron.to('m', 1.)
-        df['atomic_mass_err'] = df['atomic_mass_err'] * \
-            units.micron.to('m', 1.)
+        df['binding_energy_per_nucleon'] = df['binding_energy_per_nucleon'] * units.keV.to('MeV', 1.)
+        df['binding_energy_per_nucleon_err'] = df['binding_energy_per_nucleon_err'] * units.keV.to('MeV', 1.)
+
+        df.drop(columns=['1', 'N-Z', 'O', 'B-', 'A', 'EL', 'au', 'atomic_mass_au', 'atomic_mass_err'], inplace=True)
+
+
+        
+
 
         self.df = df
 
-    def get_NZ(self, symbol):
-        row = self.df.loc[self.df['symbol'] == symbol.lower()]
-        if row.empty:
-            raise ValueError(f'symbol not found : {symbol}')
-        return (row['N'].values[0], row['Z'].values[0])
+    def _get_row(self, symbol=None, N=None, Z=None):
+        if N is not None and Z is not None:
+            return self._get_row_from_NZ(N, Z)
+        elif symbol is not None:
+            return self._get_row_from_symbol(symbol)
+        else:
+            raise ValueError('Either symbol or N and Z must be specified.')
 
-    def get_mass(self, symbol='', N=None, Z=None):
-        if N is None or Z is None:
-            N, Z = self.get_NZ(symbol)
-        row = self.df.loc[((self.df['N'] == N) & (self.df['Z'] == Z))]
-        if row.empty:
-            if symbol is None:
-                raise ValueError(f'symbol not found : {symbol}')
-            elif N is None or Z is None:
-                raise ValueError('please provide N and Z.')
-
-        mass_excess = row['mass_excess'].values[0]
-        A = row['A'].values[0]
-        return (A * constants.u * constants.c**2 + mass_excess * units.keV).to('MeV')
+    def _get_row_from_symbol(self, symbol):
+        return self.df.loc[self.df['symbol'] == symbol.lower()]
+    
+    def _get_row_from_NZ(self, N, Z):
+        return self.df.loc[((self.df['N'] == N) & (self.df['Z'] == Z))]
 
     def get_symbol(self, N, Z):
-        row = self.df.loc[((self.df['N'] == N) & (self.df['Z'] == Z))]
-        return row['symbol'].values[0]
+        return self._get_row(N=N, Z=Z)['symbol'].values[0]
     
-    def is_physical(self, N, Z):
-        """ Check if the nucleus is in the AME table. """
-        row = self.df.loc[((self.df['N'] == N) & (self.df['Z'] == Z))]
-        return not row.empty
+    def get_NZ(self, symbol):
+        row = self._get_row(symbol)
+        return (row['N'].values[0], row['Z'].values[0])
 
-    def get_mass_data(self, fname='ame_mass.txt'):
-        """ Output mass data to a text file """
-        df = self.df[['Z', 'A', 'mass_excess']].copy()
-
-        df['mass_excess'] = df['mass_excess'] * (units.keV.to('MeV'))
+    def get_mass(self, symbol='', N=None, Z=None, unit='MeV'):
+        row = self._get_row(symbol, N, Z)
+        return row['mass'].values[0] * units.MeV.to(unit)
+    
+    def get_binding_energy(self, symbol=None, N=None, Z=None, unit='MeV'):
+        return self._get_row(symbol, N, Z)['binding_energy_per_nucleon'].values[0] * units.MeV.to(unit)
+    
+    def get_mass_data(self, fname='ame_mass.txt', usecols=['Z', 'A', 'mass', 'binding_energy_per_nucleon']):
+        """ Output the mass table to a format convenient for reading in C++.
+        Parameters
+        ----------
+        fname : str
+            Output file name.
+        usecols : list
+            Columns to be output.
+        """
+        if not set(usecols).issubset(self.df.columns):
+            raise ValueError('usecols must be a subset of the columns of the AME table.')
         
-        df['mass'] = df['A'] * (constants.u * constants.c**2).to('MeV') + df['mass_excess']
+        df = self.df[usecols].copy()
+        df.to_csv(fname, sep=' ', columns=usecols, index=False)
 
-        df.to_csv(fname, sep=' ', columns=['Z', 'A', 'mass'], index=False)
-
-        return df
+        return
