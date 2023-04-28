@@ -55,8 +55,9 @@ double AME::_GetMassUnphysical(const int &Z, const int &A)
     {
         return A * this->NucleonMass;
     }
-    else
+    else if (Z > A)
     {
+        std::cout << "Z: " << Z << " A: " << A << std::endl;
         throw std::invalid_argument("Z and A are not physical!");
     }
     return -1e10;
