@@ -39,7 +39,7 @@ void analyze_table3(TChain *&chain, Histograms *&hist, const ArgumentParser &arg
     double beam_mass = ame->GetMass(argparser.beamZ, argparser.beamA);
     double target_mass = ame->GetMass(argparser.targetZ, argparser.targetA);
     double betacms = Physics::GetReactionBeta(beam_mass, target_mass, argparser.beam_energy, argparser.beamA);
-    double rapidity_beam = Physics::GetBeamRapidity(beam_mass, target_mass, argparser.beam_energy, argparser.beamA); // not needed
+    double rapidity_beam = Physics::GetBeamRapidity(beam_mass, target_mass, argparser.beam_energy, argparser.beamA);
 
     int nevents = chain->GetEntries();
     double norm = 0.;
@@ -50,10 +50,18 @@ void analyze_table3(TChain *&chain, Histograms *&hist, const ArgumentParser &arg
     {
         chain->GetEntry(ievt);
         int multi;
+        std::string frame = "";
         if (argparser.mode == "filtered")
+        {
             multi = amd.Nc;
+            frame = "lab";
+        }
+
         else if (argparser.mode == "raw")
+        {
             multi = amd.multi;
+            frame = "cms";
+        }
 
         if (multi >= argparser.cut_on_multiplicity[0] && multi <= argparser.cut_on_multiplicity[1] && amd.b >= argparser.cut_on_impact_parameter[0] && amd.b <= argparser.cut_on_impact_parameter[1])
         {
@@ -72,9 +80,11 @@ void analyze_table3(TChain *&chain, Histograms *&hist, const ArgumentParser &arg
         for (int i = 0; i < amd.multi; i++)
         {
             double A = amd.N[i] + amd.Z[i];
-            double mass = ame->GetMass(amd.N[i], A);
-            Particle particle = {amd.N[i], amd.Z[i], amd.px[i] / A, amd.py[i] / A, amd.pz[i] / A, mass};
+            double mass = ame->GetMass(amd.Z[i], A);
+
+            Particle particle = {amd.N[i], amd.Z[i], amd.px[i] / A, amd.py[i] / A, amd.pz[i] / A, mass, frame};
             particle.Initialize(betacms, rapidity_beam);
+
             if (ievt < nevents / NDECAYS)
             {
                 hist_one_decay->Fill(particle, 1.);
@@ -93,8 +103,7 @@ void analyze_table21(TChain *&chain, Histograms *&hist, const ArgumentParser &ar
     double beam_mass = ame->GetMass(argparser.beamZ, argparser.beamA);
     double target_mass = ame->GetMass(argparser.targetZ, argparser.targetA);
     double betacms = Physics::GetReactionBeta(beam_mass, target_mass, argparser.beam_energy, argparser.beamA);
-    double rapidity_beam = Physics::GetBeamRapidity(beam_mass, target_mass, argparser.beam_energy, argparser.beamA); // not needed
-
+    double rapidity_beam = Physics::GetBeamRapidity(beam_mass, target_mass, argparser.beam_energy, argparser.beamA);
     int nevents = chain->GetEntries();
     double norm = 0.;
 
@@ -114,7 +123,7 @@ void analyze_table21(TChain *&chain, Histograms *&hist, const ArgumentParser &ar
 
         for (int i = 0; i < amd.multi; i++)
         {
-            double mass = ame->GetMass(amd.N[i], amd.Z[i] + amd.N[i]);
+            double mass = ame->GetMass(amd.Z[i], amd.Z[i] + amd.N[i]);
             Particle particle = {amd.N[i], amd.Z[i], amd.px[i], amd.py[i], amd.pz[i], mass};
             particle.Initialize(betacms, rapidity_beam);
             hist->Fill(particle, 1.);
