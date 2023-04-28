@@ -27,7 +27,7 @@ void AME::ReadAMETable(const std::string &filename)
     int Z, A;
     double mass;                       // MeV/c^2
     double binding_enregy_per_nucleon; // MeV
-    while (infile >> Z >> A >> mass >> binding_enregy_per_nucleon)
+    while (infile >> symbol >> Z >> A >> mass >> binding_enregy_per_nucleon)
     {
         std::pair pair = std::make_pair(Z, A);
         MassTable[pair] = mass;
@@ -44,6 +44,8 @@ double AME::GetMass(const int &Z, const int &A)
 
     if (this->MassTable.count({Z, A}) == 0)
     {
+
+        // std::cout << "warning : mass with Z=" << Z << " , N= " << A - Z << " not found, use A * NucleonMass instead" << std::endl;
         return this->_GetMassUnphysical(Z, A);
     }
     return this->MassTable[{Z, A}];
