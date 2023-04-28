@@ -7,7 +7,7 @@
 class Particle
 {
 public:
-    Particle(const int &N, const int &Z, const double &px_per_nucleon, const double &py_per_nucleon, const double &pz_cms_per_nucleon, const double &m = 0.);
+    Particle(const int &N, const int &Z, const double &px_per_nucleon, const double &py_per_nucleon, const double &pz_per_nucleon, const double &m = 0., const std::string &frame = "cms");
     ~Particle() { ; }
 
     void Initialize(const double &betacms, const double &beam_rapidity = 1.);
@@ -28,6 +28,9 @@ public:
 
     // rapidity lab / beam rapidity
     double rapidity_lab_normed;
+
+private:
+    std::string _frame_at_construct;
 
 protected:
     double NucleonMass = 938.272; // MeV/c^2

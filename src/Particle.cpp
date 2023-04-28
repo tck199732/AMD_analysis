@@ -1,6 +1,6 @@
 #include "Particle.hh"
 
-Particle::Particle(const int &N, const int &Z, const double &px_per_nucleon, const double &py_per_nucleon, const double &pz_cms_per_nucleon, const double &m)
+Particle::Particle(const int &N, const int &Z, const double &px_per_nucleon, const double &py_per_nucleon, const double &pz_per_nucleon, const double &m, const std::string &frame)
 {
     this->N = N;
     this->Z = Z;
@@ -8,7 +8,6 @@ Particle::Particle(const int &N, const int &Z, const double &px_per_nucleon, con
 
     this->px = px_per_nucleon * A;
     this->py = py_per_nucleon * A;
-    this->pz_cms = pz_cms_per_nucleon * A;
 
     this->mass = m;
 
@@ -16,28 +15,55 @@ Particle::Particle(const int &N, const int &Z, const double &px_per_nucleon, con
     {
         this->mass = this->A * this->NucleonMass;
     }
+    this->_frame_at_construct = frame;
 
     // initialize frame-independent quantities
-    this->phi = TMath::ATan2(this->py, this->px);
-    this->pmag_trans = TMath::Sqrt(pow(this->px, 2.) + pow(this->py, 2.));
+    this->phi = Physics::GetPhi(this->px, this->py);
+    this->pmag_trans = Physics::GetPt(this->px, this->py);
+
+    if (frame == "cms")
+    {
+        // initialize cms quantities
+        this->pz_cms = pz_per_nucleon * A;
+        this->pmag_cms = Physics::GetP(this->pmag_trans, this->pz_cms);
+        this->kinergy_cms = Physics::GetEkin(this->mass, this->pmag_cms);
+        this->theta_cms = Physics::GetTheta(this->pmag_trans, this->pz_cms);
+        this->rapidity_cms = Physics::GetRapidity(this->kinergy_cms, this->pz_cms, this->mass);
+    }
+
+    else if (frame == "lab")
+    {
+        // initialize lab quantities
+        this->pz_lab = pz_per_nucleon * A;
+        this->pmag_lab = Physics::GetP(this->pmag_trans, this->pz_lab);
+        this->kinergy_lab = Physics::GetEkin(this->mass, this->pmag_lab);
+        this->theta_lab = Physics::GetTheta(this->pmag_trans, this->pz_lab);
+        this->rapidity_lab = Physics::GetRapidity(this->kinergy_lab, this->pz_lab, this->mass);
+    }
 }
 
 void Particle::Initialize(const double &betacms, const double &beam_rapidity)
 {
     double gamma = 1. / TMath::Sqrt(1 - pow(betacms, 2.));
 
-    // initialize cms quantities
-    this->pmag_cms = TMath::Sqrt(pow(this->pmag_trans, 2.) + pow(this->pz_cms, 2.));
-    this->kinergy_cms = TMath::Sqrt(pow(this->pmag_cms, 2.) + pow(this->mass, 2.)) - this->mass;
-    this->theta_cms = TMath::ATan2(this->pmag_trans, this->pz_cms) * TMath::RadToDeg();
-    this->rapidity_cms = 0.5 * TMath::Log((this->pmag_cms + this->pz_cms) / (this->pmag_cms - this->pz_cms));
-
-    // initialize lab quantities
-    this->pz_lab = gamma * (this->pz_cms + betacms * (this->kinergy_cms + this->mass));
-    double pmag_lab = TMath::Sqrt(pow(pmag_trans, 2.) + pow(this->pz_lab, 2.));
-    this->kinergy_lab = TMath::Sqrt(pow(pmag_lab, 2.) + pow(this->mass, 2.)) - this->mass;
-    this->theta_lab = TMath::ATan2(pmag_trans, this->pz_lab) * TMath::RadToDeg();
-    this->rapidity_lab = 0.5 * TMath::Log((pmag_lab + this->pz_lab) / (pmag_lab - this->pz_lab));
+    if (this->_frame_at_construct == "cms")
+    {
+        // construct lab quantities
+        this->pz_lab = Physics::boostz(this->mass, this->pz_cms, this->kinergy_cms, -betacms);
+        this->pmag_lab = Physics::GetP(this->pmag_trans, this->pz_lab);
+        this->kinergy_lab = Physics::GetEkin(this->mass, this->pmag_lab);
+        this->theta_lab = Physics::GetTheta(this->pmag_trans, this->pz_lab);
+        this->rapidity_lab = Physics::GetRapidity(this->kinergy_lab, this->pz_lab, this->mass);
+    }
+    else if (this->_frame_at_construct == "lab")
+    {
+        // construct cms quantities
+        this->pz_cms = Physics::boostz(this->mass, this->pz_lab, this->kinergy_lab, betacms);
+        this->pmag_cms = Physics::GetP(this->pmag_trans, this->pz_cms);
+        this->kinergy_cms = Physics::GetEkin(this->mass, this->pmag_cms);
+        this->theta_cms = Physics::GetTheta(this->pmag_trans, this->pz_cms);
+        this->rapidity_cms = Physics::GetRapidity(this->kinergy_cms, this->pz_cms, this->mass);
+    }
 
     // normalize rapidity to beam rapidity
     this->rapidity_lab_normed = this->rapidity_lab / beam_rapidity;
