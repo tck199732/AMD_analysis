@@ -10,7 +10,7 @@ public:
     Particle(const int &N, const int &Z, const double &px_per_nucleon, const double &py_per_nucleon, const double &pz_cms_per_nucleon, const double &m = 0.);
     ~Particle() { ; }
 
-    void Initialize(const double &betacms);
+    void Initialize(const double &betacms, const double &beam_rapidity = 1.);
 
     int N, Z, A;
     double mass;
@@ -25,6 +25,9 @@ public:
     // lab quantities
     double pz_lab;
     double theta_lab, kinergy_lab, pmag_lab, rapidity_lab;
+
+    // rapidity lab / beam rapidity
+    double rapidity_lab_normed;
 
 protected:
     double NucleonMass = 938.272; // MeV/c^2

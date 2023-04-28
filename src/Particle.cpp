@@ -22,7 +22,7 @@ Particle::Particle(const int &N, const int &Z, const double &px_per_nucleon, con
     this->pmag_trans = TMath::Sqrt(pow(this->px, 2.) + pow(this->py, 2.));
 }
 
-void Particle::Initialize(const double &betacms)
+void Particle::Initialize(const double &betacms, const double &beam_rapidity)
 {
     double gamma = 1. / TMath::Sqrt(1 - pow(betacms, 2.));
 
@@ -38,4 +38,7 @@ void Particle::Initialize(const double &betacms)
     this->kinergy_lab = TMath::Sqrt(pow(pmag_lab, 2.) + pow(this->mass, 2.)) - this->mass;
     this->theta_lab = TMath::ATan2(pmag_trans, this->pz_lab) * TMath::RadToDeg();
     this->rapidity_lab = 0.5 * TMath::Log((pmag_lab + this->pz_lab) / (pmag_lab - this->pz_lab));
+
+    // normalize rapidity to beam rapidity
+    this->rapidity_lab_normed = this->rapidity_lab / beam_rapidity;
 }
