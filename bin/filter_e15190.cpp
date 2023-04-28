@@ -47,6 +47,94 @@ struct E15190
 AMD amd;
 E15190 filtered_amd;
 
+void Initialize_TChain(TChain *&chain, const std::vector<std::string> &pths);
+void Initialize_TTree(TTree *&tree);
+
+void Initialize_MicroBall(Microball *&microball, const std::string &reaction);
+bool ReadMicroballParticle(Microball *&mb, const Particle &part);
+bool ReadHiRAParticle(HiRA *&hira, const Particle &particle);
+void correct_phi_value(Particle &part, Microball *&microball);
+
+int main(int argc, char *argv[])
+{
+    AME *ame = new AME();
+    ArgumentParser argparser(argc, argv);
+
+    TChain *chain = new TChain("AMD");
+    Initialize_TChain(chain, argparser.input_files);
+
+    double beam_mass = ame->GetMass(argparser.beamZ, argparser.beamA);
+    double target_mass = ame->GetMass(argparser.targetZ, argparser.targetA);
+    double betacms = Physics::GetReactionBeta(beam_mass, target_mass, argparser.beam_energy, argparser.beamA);
+    double rapidity_beam = Physics::GetBeamRapidity(beam_mass, target_mass, argparser.beam_energy, argparser.beamA); // not needed
+
+    std::cout << "beam mass: " << beam_mass << std::endl;
+    std::cout << "target mass: " << target_mass << std::endl;
+    std::cout << "beta cms: " << betacms << std::endl;
+    std::cout << "rapidity beam: " << rapidity_beam << std::endl;
+
+    Microball *microball = new Microball();
+    Initialize_MicroBall(microball, argparser.reaction);
+    HiRA *hira = new HiRA();
+
+    TTree *tree = new TTree("AMD", "");
+    Initialize_TTree(tree);
+
+    ProgressBar bar(chain->GetEntries(), argparser.reaction);
+    for (int ievt = 0; ievt < chain->GetEntries(); ievt++)
+    {
+        chain->GetEntry(ievt);
+
+        microball->ResetCsIHitMap();
+        hira->ResetCounter();
+        for (unsigned int i = 0; i < amd.multi; i++)
+        {
+            double mass = ame->GetMass(amd.Z[i], amd.N[i] + amd.Z[i]);
+            Particle particle(amd.N[i], amd.Z[i], amd.px[i], amd.py[i], amd.pz[i], mass);
+            particle.Initialize(betacms);
+            // phi is calculated according to microball detector, if the particle is not covered by microball, phi is not correct and should be in the range of [-pi, pi].
+            correct_phi_value(particle, microball);
+
+            int uball_multi = microball->GetCsIHits();
+            int hira_multi = hira->GetCountPass();
+
+            if (ReadMicroballParticle(microball, particle))
+            {
+                filtered_amd.uball_N[uball_multi] = particle.N;
+                filtered_amd.uball_Z[uball_multi] = particle.Z;
+                filtered_amd.uball_px[uball_multi] = particle.px;
+                filtered_amd.uball_py[uball_multi] = particle.py;
+                filtered_amd.uball_pz[uball_multi] = particle.pz_lab;
+
+                microball->AddCsIHit(particle.theta_lab, particle.phi);
+            }
+
+            if (ReadHiRAParticle(hira, particle))
+            {
+                filtered_amd.hira_N[hira_multi] = particle.N;
+                filtered_amd.hira_Z[hira_multi] = particle.Z;
+                filtered_amd.hira_px[hira_multi] = particle.px;
+                filtered_amd.hira_py[hira_multi] = particle.py;
+                filtered_amd.hira_pz[hira_multi] = particle.pz_lab;
+                hira->CountPass();
+            }
+        }
+
+        filtered_amd.hira_multi = hira->GetCountPass();
+        filtered_amd.uball_multi = microball->GetCsIHits();
+        filtered_amd.b = amd.b;
+        // if microball multi is 0, in experiment we don't see the event. We still keep the event here as this data can be easily removed in the analysis.
+        tree->Fill();
+        bar.Update();
+    }
+
+    TFile *outputfile = new TFile(argparser.output_file.c_str(), "RECREATE");
+    outputfile->cd();
+    tree->Write();
+    outputfile->Write();
+    outputfile->Close();
+}
+
 void Initialize_TChain(TChain *&chain, const std::vector<std::string> &pths)
 {
     chain->SetBranchAddress("multi", &amd.multi);
@@ -100,75 +188,48 @@ void Initialize_TTree(TTree *&tree)
     tree->Branch("hira_pz", &filtered_amd.hira_pz[0], "hira_pz[hira_multi]/D");
 }
 
-int main(int argc, char *argv[])
+void Initialize_MicroBall(Microball *&microball, const std::string &reaction)
 {
-    ArgumentParser argparser(argc, argv);
+    fs::path project_dir = std::getenv("PROJECT_DIR");
+    fs::path database_dir = project_dir / "database/e15190/microball/acceptance";
+    fs::path path_config = database_dir / "config.dat";
+    fs::path path_geometry = database_dir / "geometry.dat";
+    fs::path path_threshold = database_dir / "fitted_threshold.dat";
 
-    TChain *chain = new TChain("AMD");
-    Initialize_TChain(chain, argparser.input_files);
+    microball->ConfigurateSetup(reaction, path_config.string());
+    microball->ReadGeometryMap(path_geometry.string());
+    microball->ReadThresholdKinergyMap(path_threshold.string());
+}
 
-    double betacms = Physics::GetReactionBeta(argparser.reaction);
-    double rapidity_beam = Physics::GetBeamRapidity(argparser.reaction); // not needed
+bool ReadMicroballParticle(Microball *&mb, const Particle &part)
+{
+    bool pass_charge = mb->IsChargedParticle(part.Z);
+    bool pass_coverage = mb->IsCovered(part.theta_lab, part.phi);
+    bool pass_threshold = mb->IsAccepted(part.kinergy_lab, part.theta_lab, part.N + part.Z, part.Z);
+    return pass_charge && pass_coverage && pass_threshold;
+}
 
-    Microball *microball = new Microball();
-    Initialize_MicroBall(microball, argparser.reaction);
-    HiRA *hira = new HiRA();
+bool ReadHiRAParticle(HiRA *&hira, const Particle &particle)
+{
+    return hira->PassAngularCut(particle.theta_lab, particle.phi) && hira->PassCharged(particle.Z) && hira->PassKinergyCut(particle.Z + particle.N, particle.Z, particle.kinergy_lab);
+}
 
-    TTree *tree = new TTree("AMD", "");
-    Initialize_TTree(tree);
-
-    ReadAMETable(AME_MASS_TABLE);
-
-    ProgressBar bar(chain->GetEntries(), argparser.reaction);
-    for (int ievt = 0; ievt < chain->GetEntries(); ievt++)
+void correct_phi_value(Particle &part, Microball *&microball)
+{
+    int ring = microball->GetRingID(part.theta_lab);
+    if (ring == -1)
     {
-        chain->GetEntry(ievt);
-
-        microball->ResetCsIHitMap();
-        hira->ResetCounter();
-        for (unsigned int i = 0; i < amd.multi; i++)
-        {
-            particle particle = {amd.N[i], amd.Z[i], amd.px[i], amd.py[i], amd.pz[i]};
-            particle.initialize(betacms);
-            // phi is calculated according to microball detector, if the particle is not covered by microball, phi is not correct and should be in the range of [-pi, pi].
-            correct_phi_value(particle, microball);
-
-            int uball_multi = microball->GetCsIHits();
-            int hira_multi = hira->GetCountPass();
-
-            if (ReadMicroballParticle(microball, particle))
-            {
-                filtered_amd.uball_N[uball_multi] = particle.N;
-                filtered_amd.uball_Z[uball_multi] = particle.Z;
-                filtered_amd.uball_px[uball_multi] = particle.px;
-                filtered_amd.uball_py[uball_multi] = particle.py;
-                filtered_amd.uball_pz[uball_multi] = particle.pz_lab;
-
-                microball->AddCsIHit(particle.theta_lab, particle.phi);
-            }
-
-            if (ReadHiRAParticle(hira, particle))
-            {
-                filtered_amd.hira_N[hira_multi] = particle.N;
-                filtered_amd.hira_Z[hira_multi] = particle.Z;
-                filtered_amd.hira_px[hira_multi] = particle.px;
-                filtered_amd.hira_py[hira_multi] = particle.py;
-                filtered_amd.hira_pz[hira_multi] = particle.pz_lab;
-                hira->CountPass();
-            }
-        }
-
-        filtered_amd.hira_multi = hira->GetCountPass();
-        filtered_amd.uball_multi = microball->GetCsIHits();
-        filtered_amd.b = amd.b;
-        // if microball multi is 0, in experiment we don't see the event. We still keep the event here as this data can be easily removed in the analysis.
-        tree->Fill();
-        bar.Update();
+        return;
     }
+    double phi_min_in_ring = microball->GetPhiMinInRing(ring);
+    double phi_max_in_ring = microball->GetPhiMaxInRing(ring);
 
-    TFile *outputfile = new TFile(argparser.output_file.c_str(), "RECREATE");
-    outputfile->cd();
-    tree->Write();
-    outputfile->Write();
-    outputfile->Close();
+    if (part.phi < phi_min_in_ring)
+    {
+        part.phi += 360;
+    }
+    if (part.phi > phi_max_in_ring)
+    {
+        part.phi -= 360;
+    }
 }
