@@ -44,8 +44,6 @@ double AME::GetMass(const int &Z, const int &A)
 
     if (this->MassTable.count({Z, A}) == 0)
     {
-
-        // std::cout << "warning : mass with Z=" << Z << " , N= " << A - Z << " not found, use A * NucleonMass instead" << std::endl;
         return this->_GetMassUnphysical(Z, A);
     }
     return this->MassTable[{Z, A}];
