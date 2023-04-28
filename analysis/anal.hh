@@ -1,4 +1,6 @@
-#include "Physics.cpp"
+#include "AME.hh"
+#include "Particle.hh"
+#include "Physics.hh"
 #include "ProgressBar.cpp"
 
 #include <array>
@@ -32,85 +34,7 @@ struct AMD
 };
 
 AMD amd;
-void Initialize_TChain(TChain *&chain, const std::vector<std::string> &input_pths, const std::string &analysis = "filtered", const std::string &mode = "3")
-{
-    for (auto &pth : input_pths)
-    {
-        if (!fs::exists(pth))
-        {
-            std::string msg = Form("%s does not exist.", pth.c_str());
-            throw std::invalid_argument(msg.c_str());
-        }
-        chain->Add(pth.c_str());
-    }
-
-    if (analysis == "filtered" && mode == "3")
-    {
-        chain->SetBranchAddress("uball_multi", &amd.Nc);
-        chain->SetBranchAddress("hira_multi", &amd.multi);
-        chain->SetBranchAddress("b", &amd.b);
-        chain->SetBranchAddress("hira_px", &amd.px[0]);
-        chain->SetBranchAddress("hira_py", &amd.py[0]);
-        chain->SetBranchAddress("hira_pz", &amd.pz[0]);
-        chain->SetBranchAddress("hira_N", &amd.N[0]);
-        chain->SetBranchAddress("hira_Z", &amd.Z[0]);
-    }
-
-    else if (analysis == "raw")
-    {
-        chain->SetBranchAddress("multi", &amd.multi);
-        chain->SetBranchAddress("b", &amd.b);
-        chain->SetBranchAddress("px", &amd.px[0]);
-        chain->SetBranchAddress("py", &amd.py[0]);
-        chain->SetBranchAddress("pz", &amd.pz[0]);
-        chain->SetBranchAddress("N", &amd.N[0]);
-        chain->SetBranchAddress("Z", &amd.Z[0]);
-    }
-}
-
-std::map<std::array<int, 2>, double> AME_MASS_TABLE;
-void ReadAMETable(std::map<std::array<int, 2>, double> &ame_mass_table, const std::string &filename = "")
-{
-    std::string path = filename;
-    if (path.empty())
-    {
-        fs::path project_dir = std::getenv("PROJECT_DIR");
-        fs::path dat_path = project_dir / "database/ame/ame_mass.txt";
-        path = fs::absolute(dat_path);
-    }
-    std::ifstream infile(path.c_str());
-    infile.ignore(99, '\n');
-    int Z, A;
-    double mass;
-    while (infile >> Z)
-    {
-        infile >> A >> mass;
-        ame_mass_table[{Z, A}] = mass;
-    }
-}
-
-struct particle
-{
-    int N, Z;
-    double px, py, pz;
-    double pmag_trans, pmag_lab, kinergy_lab, theta_lab, phi, rapidity_lab, rapidity_lab_normed;
-    void initialize(const double &betacms, const double &beam_rapidity);
-};
-
-void particle::initialize(const double &betacms, const double &beam_rapidity)
-{
-    double mass = AME_MASS_TABLE[{this->Z, this->N + this->Z}];
-    double A = this->N + this->Z;
-
-    this->pmag_trans = TMath::Sqrt(pow(this->px, 2.) + pow(this->py, 2.));
-    this->pmag_lab = TMath::Sqrt(pow(pmag_trans, 2.) + pow(this->pz, 2.));
-    this->kinergy_lab = TMath::Sqrt(pow(pmag_lab, 2.) + pow(mass, 2.)) - mass;
-
-    this->theta_lab = TMath::ATan2(this->pmag_trans, this->pz) * TMath::RadToDeg();
-    this->phi = TMath::ATan2(this->py, this->px) * TMath::RadToDeg();
-    this->rapidity_lab = Physics::GetRapidity(this->kinergy_lab, this->pz, mass);
-    this->rapidity_lab_normed = this->rapidity_lab / beam_rapidity;
-}
+void Initialize_TChain(TChain *&chain, const std::vector<std::string> &input_pths, const std::string &analysis = "filtered", const std::string &mode = "3");
 
 class ArgumentParser
 {
@@ -124,6 +48,10 @@ public:
     std::string table = "";
     std::array<int, 2> cut_on_multiplicity = {0, 128};
     std::array<double, 2> cut_on_impact_parameter = {0., 3.};
+
+    std::string beam;
+    std::string target;
+    int beamA, beamZ, targetA, targetZ, beam_energy;
 
     ArgumentParser(int argc, char *argv[])
     {
@@ -149,6 +77,7 @@ public:
             case 'r':
             {
                 this->reaction = optarg;
+                this->_Initialize_ReactionSystem(this->reaction);
                 break;
             }
             case 'o':
@@ -240,7 +169,94 @@ public:
         )";
         std::cout << msg << std::endl;
     }
+    void _Initialize_ReactionSystem(const std::string &reaction)
+    {
+        {
+            std::regex pattern("[A-Z][a-z]");
+            std::vector<std::string> tokens;
+            std::sregex_iterator iter(reaction.begin(), reaction.end(), pattern);
+            std::sregex_iterator end;
+
+            while (iter != end)
+            {
+                std::smatch match = *iter;
+                tokens.push_back(match.str());
+                ++iter;
+            }
+
+            this->beam = tokens[0];
+            this->target = tokens[1];
+
+            auto GetZ = [](const std::string &nuclei) -> double
+            {
+                if (nuclei == "Ca")
+                    return 20;
+                else if (nuclei == "Ni")
+                    return 28;
+                else if (nuclei == "Sn")
+                    return 50;
+                else
+                    return 0;
+            };
+            this->beamZ = GetZ(tokens[0]);
+            this->targetZ = GetZ(tokens[1]);
+        }
+
+        {
+            std::regex pattern("[0-9]+");
+            std::vector<int> tokens;
+
+            std::sregex_iterator iter(reaction.begin(), reaction.end(), pattern);
+            std::sregex_iterator end;
+
+            while (iter != end)
+            {
+                std::smatch match = *iter;
+                tokens.push_back(std::stoi(match.str()));
+                ++iter;
+            }
+            this->beamA = tokens[0];
+            this->targetA = tokens[1];
+            this->beam_energy = tokens[2];
+        }
+    }
 
 protected:
     std::vector<option> options;
 };
+
+void Initialize_TChain(TChain *&chain, const std::vector<std::string> &input_pths, const std::string &analysis, const std::string &mode)
+{
+    for (auto &pth : input_pths)
+    {
+        if (!fs::exists(pth))
+        {
+            std::string msg = Form("%s does not exist.", pth.c_str());
+            throw std::invalid_argument(msg.c_str());
+        }
+        chain->Add(pth.c_str());
+    }
+
+    if (analysis == "filtered" && mode == "3")
+    {
+        chain->SetBranchAddress("uball_multi", &amd.Nc);
+        chain->SetBranchAddress("hira_multi", &amd.multi);
+        chain->SetBranchAddress("b", &amd.b);
+        chain->SetBranchAddress("hira_px", &amd.px[0]);
+        chain->SetBranchAddress("hira_py", &amd.py[0]);
+        chain->SetBranchAddress("hira_pz", &amd.pz[0]);
+        chain->SetBranchAddress("hira_N", &amd.N[0]);
+        chain->SetBranchAddress("hira_Z", &amd.Z[0]);
+    }
+
+    else if (analysis == "raw")
+    {
+        chain->SetBranchAddress("multi", &amd.multi);
+        chain->SetBranchAddress("b", &amd.b);
+        chain->SetBranchAddress("px", &amd.px[0]);
+        chain->SetBranchAddress("py", &amd.py[0]);
+        chain->SetBranchAddress("pz", &amd.pz[0]);
+        chain->SetBranchAddress("N", &amd.N[0]);
+        chain->SetBranchAddress("Z", &amd.Z[0]);
+    }
+}
