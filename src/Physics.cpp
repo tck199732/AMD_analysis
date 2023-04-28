@@ -55,7 +55,7 @@ float Physics::GetTheta(const float &pt, const float &pz)
 }
 
 /**
- * @brief Boost from lab framm to cms frame if betacms is positive
+ * @brief Boost from lab frame to cms frame if betacms is positive
  *
  * @param mass
  * @param pz
