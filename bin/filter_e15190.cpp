@@ -90,8 +90,9 @@ int main(int argc, char *argv[])
         for (unsigned int i = 0; i < amd.multi; i++)
         {
             double mass = ame->GetMass(amd.Z[i], amd.N[i] + amd.Z[i]);
-            Particle particle(amd.N[i], amd.Z[i], amd.px[i], amd.py[i], amd.pz[i], mass);
-            particle.Initialize(betacms);
+            Particle particle(amd.N[i], amd.Z[i], amd.px[i], amd.py[i], amd.pz[i], mass, "cms");
+            particle.Initialize(betacms, rapidity_beam);
+
             // phi is calculated according to microball detector, if the particle is not covered by microball, phi is not correct and should be in the range of [-pi, pi].
             correct_phi_value(particle, microball);
 
@@ -106,7 +107,10 @@ int main(int argc, char *argv[])
                 filtered_amd.uball_py[uball_multi] = particle.py;
                 filtered_amd.uball_pz[uball_multi] = particle.pz_lab;
 
-                microball->AddCsIHit(particle.theta_lab, particle.phi);
+                double theta_deg = particle.theta_lab * TMath::RadToDeg();
+                double phi_deg = particle.phi * TMath::RadToDeg();
+
+                microball->AddCsIHit(theta_deg, phi_deg);
             }
 
             if (ReadHiRAParticle(hira, particle))
@@ -203,20 +207,27 @@ void Initialize_MicroBall(Microball *&microball, const std::string &reaction)
 
 bool ReadMicroballParticle(Microball *&mb, const Particle &part)
 {
+    double theta_deg = part.theta_lab * TMath::RadToDeg();
+    double phi_deg = part.phi * TMath::RadToDeg();
     bool pass_charge = mb->IsChargedParticle(part.Z);
-    bool pass_coverage = mb->IsCovered(part.theta_lab, part.phi);
-    bool pass_threshold = mb->IsAccepted(part.kinergy_lab, part.theta_lab, part.N + part.Z, part.Z);
+    bool pass_coverage = mb->IsCovered(theta_deg, phi_deg);
+    bool pass_threshold = mb->IsAccepted(part.kinergy_lab, theta_deg, part.N + part.Z, part.Z);
     return pass_charge && pass_coverage && pass_threshold;
 }
 
 bool ReadHiRAParticle(HiRA *&hira, const Particle &particle)
 {
-    return hira->PassAngularCut(particle.theta_lab, particle.phi) && hira->PassCharged(particle.Z) && hira->PassKinergyCut(particle.Z + particle.N, particle.Z, particle.kinergy_lab);
+    double theta_deg = particle.theta_lab * TMath::RadToDeg();
+    double phi_deg = particle.phi * TMath::RadToDeg();
+    return hira->PassAngularCut(theta_deg, phi_deg) && hira->PassCharged(particle.Z) && hira->PassKinergyCut(particle.Z + particle.N, particle.Z, particle.kinergy_lab);
 }
 
 void correct_phi_value(Particle &part, Microball *&microball)
 {
-    int ring = microball->GetRingID(part.theta_lab);
+    double theta_deg = part.theta_lab * TMath::RadToDeg();
+    double phi_deg = part.phi * TMath::RadToDeg();
+
+    int ring = microball->GetRingID(theta_deg);
     if (ring == -1)
     {
         return;
@@ -224,12 +235,12 @@ void correct_phi_value(Particle &part, Microball *&microball)
     double phi_min_in_ring = microball->GetPhiMinInRing(ring);
     double phi_max_in_ring = microball->GetPhiMaxInRing(ring);
 
-    if (part.phi < phi_min_in_ring)
+    if (phi_deg < phi_min_in_ring)
     {
-        part.phi += 360;
+        part.phi += 2. * TMath::Pi();
     }
-    if (part.phi > phi_max_in_ring)
+    if (phi_deg > phi_max_in_ring)
     {
-        part.phi -= 360;
+        part.phi -= 2. * TMath::Pi();
     }
 }
