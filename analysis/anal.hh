@@ -32,6 +32,12 @@ struct AMD
     std::array<double, NMAX> pz;
     std::array<int, NMAX> N;
     std::array<int, NMAX> Z;
+
+    // spacetime stored in table21t.root
+    std::array<double, NMAX> x;
+    std::array<double, NMAX> y;
+    std::array<double, NMAX> z;
+    std::array<double, NMAX> t;
 };
 
 AMD amd;
@@ -259,5 +265,13 @@ void Initialize_TChain(TChain *&chain, const std::vector<std::string> &input_pth
         chain->SetBranchAddress("pz", &amd.pz[0]);
         chain->SetBranchAddress("N", &amd.N[0]);
         chain->SetBranchAddress("Z", &amd.Z[0]);
+    }
+
+    if (analysis == "raw" && mode == "21t")
+    {
+        chain->SetBranchAddress("x", &amd.x[0]);
+        chain->SetBranchAddress("y", &amd.y[0]);
+        chain->SetBranchAddress("z", &amd.z[0]);
+        chain->SetBranchAddress("t", &amd.t[0]);
     }
 }
