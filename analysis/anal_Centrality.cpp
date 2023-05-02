@@ -1,8 +1,8 @@
 #include "anal.hh"
 
-void Replace_Errorbars(EmissionTime *&hist, EmissionTime *&hist_one_decay);
-void analyze_table3(TChain *&chain, EmissionTime *&hist, const ArgumentParser &argparser);
-void analyze_table21(TChain *&chain, EmissionTime *&hist, const ArgumentParser &argparser);
+void Replace_Errorbars(ImpactParameterMultiplicity *&hist, ImpactParameterMultiplicity *&hist_one_decay);
+void analyze_table3(TChain *&chain, ImpactParameterMultiplicity *&hist, const ArgumentParser &argparser);
+void analyze_table21(TChain *&chain, ImpactParameterMultiplicity *&hist, const ArgumentParser &argparser);
 
 int main(int argc, char *argv[])
 {
@@ -31,9 +31,9 @@ int main(int argc, char *argv[])
     outputfile->Close();
 }
 
-void analyze_table3(TChain *&chain, EmissionTime *&hist, const ArgumentParser &argparser)
+void analyze_table3(TChain *&chain, ImpactParameterMultiplicity *&hist, const ArgumentParser &argparser)
 {
-    EmissionTime *hist_one_decay = new EmissionTime("table3_one_decay");
+    ImpactParameterMultiplicity *hist_one_decay = new ImpactParameterMultiplicity("table3_one_decay");
     for (int ievt = 0; ievt < chain->GetEntries(); ievt++)
     {
         chain->GetEntry(ievt);
@@ -67,7 +67,7 @@ void analyze_table3(TChain *&chain, EmissionTime *&hist, const ArgumentParser &a
     return;
 }
 
-void analyze_table21(TChain *&chain, EmissionTime *&hist, const ArgumentParser &argparser)
+void analyze_table21(TChain *&chain, ImpactParameterMultiplicity *&hist, const ArgumentParser &argparser)
 {
     for (int ievt = 0; ievt < chain->GetEntries(); ievt++)
     {
@@ -89,7 +89,7 @@ void analyze_table21(TChain *&chain, EmissionTime *&hist, const ArgumentParser &
     return;
 }
 
-void Replace_Errorbars(EmissionTime *&hist, EmissionTime *&hist_one_decay)
+void Replace_Errorbars(ImpactParameterMultiplicity *&hist, ImpactParameterMultiplicity *&hist_one_decay)
 {
     TH2D *h2 = hist->Histogram2D_Collection[hist->name];
     TH2D *htemp = hist_one_decay->Histogram2D_Collection[hist_one_decay->name];
