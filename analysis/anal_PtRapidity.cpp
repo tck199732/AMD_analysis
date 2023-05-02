@@ -81,7 +81,7 @@ void analyze_table3(TChain *&chain, PtRapidity *&hist, const ArgumentParser &arg
             double A = amd.N[i] + amd.Z[i];
             double mass = ame->GetMass(amd.Z[i], A);
 
-            Particle particle = {amd.N[i], amd.Z[i], amd.px[i] / A, amd.py[i] / A, amd.pz[i] / A, mass, frame};
+            Particle particle(amd.N[i], amd.Z[i], amd.px[i] / A, amd.py[i] / A, amd.pz[i] / A, mass, frame);
             particle.Initialize(betacms, rapidity_beam);
 
             if (ievt < nevents / NDECAYS)
@@ -123,7 +123,7 @@ void analyze_table21(TChain *&chain, PtRapidity *&hist, const ArgumentParser &ar
         for (int i = 0; i < amd.multi; i++)
         {
             double mass = ame->GetMass(amd.Z[i], amd.Z[i] + amd.N[i]);
-            Particle particle = {amd.N[i], amd.Z[i], amd.px[i], amd.py[i], amd.pz[i], mass};
+            Particle particle(amd.N[i], amd.Z[i], amd.px[i], amd.py[i], amd.pz[i], mass);
             particle.Initialize(betacms, rapidity_beam);
             hist->Fill(particle, 1.);
         }
