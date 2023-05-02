@@ -9,9 +9,9 @@ INCLUDE += ${addprefix -I, ${VPATH}}
 
 .PHONY: all clean
 
-all: anal
+all: anal_PtRapidity
 
-anal : anal.cpp ${SRC}
+% : %.cpp ${SRC}
 	${COMPILER} $^ -o $@.exe ${INCLUDE} 
 
 clean:

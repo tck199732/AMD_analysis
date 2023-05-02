@@ -45,8 +45,8 @@ public:
     std::string reaction = "";
     std::vector<std::string> input_files = {};
     std::string output_file = "";
-    std::string mode = "";
-    std::string table = "";
+    std::string mode = "filtered";
+    std::string table = "3";
     std::array<int, 2> cut_on_multiplicity = {0, 128};
     std::array<double, 2> cut_on_impact_parameter = {0., 3.};
 
