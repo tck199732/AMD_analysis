@@ -13,6 +13,11 @@ int main(int argc, char *argv[])
     TChain *chain = new TChain("AMD");
     Initialize_TChain(chain, argparser.input_files, argparser.mode, argparser.table);
 
+    double beam_mass = ame->GetMass(argparser.beamZ, argparser.beamA);
+    double target_mass = ame->GetMass(argparser.targetZ, argparser.targetA);
+    double betacms = Physics::GetReactionBeta(beam_mass, target_mass, argparser.beam_energy, argparser.beamA);
+    double rapidity_beam = Physics::GetBeamRapidity(beam_mass, target_mass, argparser.beam_energy, argparser.beamA);
+
     PmagEmissionTime *hist = new PmagEmissionTime("table21t");
 
     for (int ievt = 0; ievt < chain->GetEntries(); ievt++)
@@ -29,8 +34,8 @@ int main(int argc, char *argv[])
             double mass = ame->GetMass(amd.Z[ip], A);
             Particle particle(amd.N[ip], amd.Z[ip], amd.px[ip], amd.py[ip], amd.pz[ip], mass);
             particle.SetXYZT(amd.x[ip], amd.y[ip], amd.z[ip], amd.t[ip], "cms");
-            particle.Initialize(amd.betacms, amd.rapidity_beam);
-            hist->Fill(particle);
+            particle.Initialize(betacms, rapidity_beam);
+            hist->Fill(particle, 1.);
         }
     }
 
