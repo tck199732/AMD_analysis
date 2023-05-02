@@ -90,7 +90,7 @@ void Particle::Initialize(const double &betacms, const double &beam_rapidity)
     this->rapidity_lab_normed = this->rapidity_lab / beam_rapidity;
 }
 
-void Particle::SetXYZT(const double &x, const double &y, const double &z, const double &t, const std::string &frame = "cms")
+void Particle::SetXYZT(const double &x, const double &y, const double &z, const double &t, const std::string &frame)
 {
     this->x = x;
     this->y = y;
