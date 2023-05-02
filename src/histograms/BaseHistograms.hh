@@ -19,7 +19,7 @@ public:
     virtual void Normalize(const double &scale);
     virtual void Write();
 
-    std::string name;
+    std::string name, suffix;
     std::map<std::string, TH1D *> Histogram1D_Collection;
     std::map<std::string, TH2D *> Histogram2D_Collection;
     std::map<std::string, TH3D *> Histogram3D_Collection;
@@ -50,7 +50,7 @@ class ImpactParameterMultiplicity : public BaseHistograms
 {
 public:
     ImpactParameterMultiplicity(const std::string &suffix);
-    void Fill(const double &weight);
+    void Fill(const int &multi, const double &b, const double &weight);
 };
 
 class KinergyTheta : public BaseHistograms
@@ -70,10 +70,10 @@ public:
     void Fill(const Particle &particle, const double &weight);
 };
 
-class EmissionTime : public BaseHistograms
+class PmagEmissionTime : public BaseHistograms
 {
 public:
-    EmissionTime(const std::string &suffix);
+    PmagEmissionTime(const std::string &suffix);
     void Fill(const Particle &particle, const double &weight);
 };
 #endif

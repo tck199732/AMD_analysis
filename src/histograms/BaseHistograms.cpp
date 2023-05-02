@@ -1,7 +1,8 @@
 #include "BaseHistograms.hh"
 BaseHistograms::BaseHistograms(const std::string &suffix)
 {
-    this->name = suffix;
+    this->name = "";
+    this->suffix = suffix;
 }
 
 BaseHistograms::~BaseHistograms()
