@@ -12,19 +12,24 @@ public:
 
     void Initialize(const double &betacms, const double &beam_rapidity = 1.);
 
+    void SetXYZT(const double &x, const double &y, const double &z, const double &t, const std::string &frame = "cms");
+
     int N, Z, A;
     double mass;
 
     // same in lab and cms
     double px, py, phi, pmag_trans;
+    double x, y;
 
     // cms quantities
     double pz_cms;
     double theta_cms, kinergy_cms, pmag_cms, rapidity_cms;
+    double z_cms, t_cms;
 
     // lab quantities
     double pz_lab;
     double theta_lab, kinergy_lab, pmag_lab, rapidity_lab;
+    double z_lab, t_lab;
 
     // rapidity lab / beam rapidity
     double rapidity_lab_normed;
