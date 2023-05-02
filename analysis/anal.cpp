@@ -1,9 +1,8 @@
 #include "anal.hh"
-#include "Histograms.hh"
 
-void Replace_Errorbars(Histograms *&hist, Histograms *&hist_one_decay);
-void analyze_table3(TChain *&chain, Histograms *&hist, const ArgumentParser &argparser);
-void analyze_table21(TChain *&chain, Histograms *&hist, const ArgumentParser &argparser);
+void Replace_Errorbars(PtRapidity *&hist, PtRapidity *&hist_one_decay);
+void analyze_table3(TChain *&chain, PtRapidity *&hist, const ArgumentParser &argparser);
+void analyze_table21(TChain *&chain, PtRapidity *&hist, const ArgumentParser &argparser);
 
 AME *ame;
 int main(int argc, char *argv[])
@@ -14,15 +13,15 @@ int main(int argc, char *argv[])
     TChain *chain = new TChain("AMD");
     Initialize_TChain(chain, argparser.input_files, argparser.mode, argparser.table);
 
-    Histograms *hist = 0;
+    PtRapidity *hist = 0;
     if (argparser.table == "3")
     {
-        hist = new Histograms("secondary");
+        hist = new PtRapidity("secondary");
         analyze_table3(chain, hist, argparser);
     }
     else if (argparser.table == "21")
     {
-        hist = new Histograms("primary");
+        hist = new PtRapidity("primary");
         analyze_table21(chain, hist, argparser);
     }
 
@@ -33,9 +32,9 @@ int main(int argc, char *argv[])
     outputfile->Write();
 }
 
-void analyze_table3(TChain *&chain, Histograms *&hist, const ArgumentParser &argparser)
+void analyze_table3(TChain *&chain, PtRapidity *&hist, const ArgumentParser &argparser)
 {
-    Histograms *hist_one_decay = new Histograms("secondary_one_decay");
+    PtRapidity *hist_one_decay = new PtRapidity("secondary_one_decay");
     double beam_mass = ame->GetMass(argparser.beamZ, argparser.beamA);
     double target_mass = ame->GetMass(argparser.targetZ, argparser.targetA);
     double betacms = Physics::GetReactionBeta(beam_mass, target_mass, argparser.beam_energy, argparser.beamA);
@@ -98,7 +97,7 @@ void analyze_table3(TChain *&chain, Histograms *&hist, const ArgumentParser &arg
     Replace_Errorbars(hist, hist_one_decay);
 }
 
-void analyze_table21(TChain *&chain, Histograms *&hist, const ArgumentParser &argparser)
+void analyze_table21(TChain *&chain, PtRapidity *&hist, const ArgumentParser &argparser)
 {
     double beam_mass = ame->GetMass(argparser.beamZ, argparser.beamA);
     double target_mass = ame->GetMass(argparser.targetZ, argparser.targetA);
@@ -133,15 +132,15 @@ void analyze_table21(TChain *&chain, Histograms *&hist, const ArgumentParser &ar
     hist->Normalize(norm);
 }
 
-void Replace_Errorbars(Histograms *&hist, Histograms *&hist_one_decay)
+void Replace_Errorbars(PtRapidity *&hist, PtRapidity *&hist_one_decay)
 {
-    for (auto &[pn, h2] : hist->h2_pta_rapidity_lab)
+    for (auto &[pn, h2] : hist->Histogram2D_Collection)
     {
         for (int i = 0; i < h2->GetNbinsX(); i++)
         {
             for (int j = 0; j < h2->GetNbinsY(); j++)
             {
-                double error = hist_one_decay->h2_pta_rapidity_lab[pn]->GetBinError(i + 1, j + 1);
+                double error = hist_one_decay->Histogram2D_Collection[pn]->GetBinError(i + 1, j + 1);
                 h2->SetBinError(i + 1, j + 1, error);
             }
         }

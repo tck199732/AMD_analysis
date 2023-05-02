@@ -2,6 +2,7 @@
 #include "Particle.hh"
 #include "Physics.hh"
 #include "ProgressBar.cpp"
+#include "BaseHistograms.hh"
 
 #include <array>
 #include <vector>
