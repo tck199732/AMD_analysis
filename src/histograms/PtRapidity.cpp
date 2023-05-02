@@ -5,7 +5,7 @@ PtRapidity::PtRapidity(const std::string &suffix) : BaseHistograms(suffix)
     this->name = "h2_PtRapidity_" + suffix;
     for (auto &pn : this->PARTICLENAMES)
     {
-        this->Histogram2D_Collection[pn] = new TH2D((this->name + "_" + pn).c_str(), "", 100, 0, 1., 800, 0, 800);
+        this->Histogram2D_Collection[pn] = new TH2D((this->name + "_" + pn).c_str(), "", 300, -1.5, 1.5, 800, 0, 800);
         this->Histogram2D_Collection[pn]->Sumw2();
     }
 }
