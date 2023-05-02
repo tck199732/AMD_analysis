@@ -50,7 +50,7 @@ class ImpactParameterMultiplicity : public BaseHistograms
 {
 public:
     ImpactParameterMultiplicity(const std::string &suffix);
-    void Fill(const int &multi, const double &b, const double &weight);
+    void Fill(const int &multi, const double &b, const double &weight = 1.);
 };
 
 class KinergyTheta : public BaseHistograms
