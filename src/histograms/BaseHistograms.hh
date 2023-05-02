@@ -56,8 +56,11 @@ public:
 class KinergyTheta : public BaseHistograms
 {
 public:
-    KinergyTheta(const std::string &suffix);
+    KinergyTheta(const std::string &suffix, const std::string &frame = "cms");
     void Fill(const Particle &particle, const double &weight);
+
+private:
+    std::string frame;
 };
 
 class PtRapidity : public BaseHistograms
