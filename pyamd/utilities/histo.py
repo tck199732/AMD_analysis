@@ -2,6 +2,17 @@ import numpy as np
 import pandas as pd
 
 class histogram_handler:
+    """
+    A class for handling 1D / 2D histograms in terms of pd.DataFrame. By default, a dataframe representing a 2D histogram should have the following columns:
+    - x : the x-axis
+    - y : the y-axis
+    - y_err : the error of y
+    - y_ferr : the fractional error of y
+    - z : the z-axis
+    - z_err : the error of z
+    - z_ferr : the fractional error of z
+    fractions of the error of y and z are optional.
+    """
     @staticmethod
     def projection(df, cut=None, range=None, bins=None, axis='x', normalize=True):
         """ Project a 2D histogram (in terms of pd.DataFrame) along an axis
@@ -68,6 +79,80 @@ class histogram_handler:
         })
 
     @staticmethod
+    def profile(df, cut=None, axis='x', option=None, scale=1.):
+        """
+        Parameters
+        ----------
+        df : pd.DataFrame
+            Dataframe containing the 2D histogram to be profiled.
+        cut : tuple, optional
+            Range of the axis to be cut. If None, no cut is applied.
+        axis : str, optional
+            Axis along which the profile is performed. Must be 'x' or 'y'.
+        option : str, optional
+            option for the error calculation in the same way as in ROOT, i.e. 
+            `None` : std. dev. divided by sqrt(scale), where scale is the number of entries in the bin 
+            `'s'` : std. dev.
+            `'g'` : 1./sqrt(W) where W is the sum of the weights
+        scale : float, optional
+            Scale factor for the error if option is None.
+        """
+        df = df.copy()
+        if df.shape[1] < 4:
+            raise ValueError('Dataframe must have at least 3 columns')
+        elif df.shape[1] == 4:
+            df.columns = ['x', 'y', 'z', 'z_err']
+        elif df.shape[1] == 5:
+            df.columns = ['x', 'y', 'z', 'z_err', 'z_ferr']
+        else:
+            raise ValueError('Dataframe must have at most 5 columns')
+        
+        df.query('z > 0 & z_err > 0', inplace=True)
+
+        cut_axis = 'y' if axis == 'x' else 'x'
+        if cut is not None:
+            bw = df[cut_axis][1] - df[cut_axis][0]
+            cut = (cut[0] - bw/2, cut[1] + bw/2)
+            df.query(f'{cut_axis} > {cut[0]} & {cut_axis} < {cut[1]}', inplace=True)
+
+        hist = df.groupby(cut_axis).apply(
+            lambda subdf: np.average(subdf[axis], weights=subdf['z'])
+        )
+
+        x = hist.index.to_numpy()
+        hist = hist.to_numpy()
+
+        if option is None:
+
+            entries = df.groupby(cut_axis).apply(
+                lambda subdf: np.sum(subdf['z'])
+            )
+            entries *= scale
+            mean2 = df.groupby(cut_axis).apply(
+                lambda subdf: np.average(subdf[axis] ** 2, weights=subdf['z'])
+            )
+            histerr = np.sqrt(mean2 - hist ** 2) / np.sqrt(entries)
+
+        elif option == 's':
+            mean2 = df.groupby(cut_axis).apply(
+                lambda subdf: np.average(subdf[axis] ** 2, weights=subdf['z'])
+            )
+            histerr = np.sqrt(mean2 - hist ** 2)
+
+        elif option == 'g':
+            histerr = df.groupby(cut_axis).apply(
+                lambda subdf: 1. / np.sqrt(np.sum(subdf['z_err']))
+            )
+        
+        histerr = histerr.to_numpy()
+        return pd.DataFrame({
+            'x' : x,
+            'y' : hist,
+            'y_err' : histerr,
+            'y_ferr' : np.divide(histerr, hist, out=np.zeros_like(hist), where=hist!=0)
+        })
+
+    @staticmethod
     def query(df, xrange, yrange=None):
         df = df.copy()
         xbw = np.diff(xrange)[0] / df.shape[0]
@@ -116,6 +201,60 @@ class histogram_handler:
             'y' : hist / norm,
             'y_err' : histerr / norm,
             'y_ferr' : np.divide(histerr, hist, out=np.zeros_like(hist), where=hist!=0)
+        })
+
+    @staticmethod
+    def rebin2D(df, range, bins=None, normalize=True):
+        df = df.copy()
+        if df.shape[1] < 4:
+            raise ValueError('Dataframe must have at least 3 columns')
+        elif df.shape[1] == 4:
+            df.columns = ['x', 'y', 'z', 'z_err']
+        elif df.shape[1] == 5:
+            df.columns = ['x', 'y', 'z', 'z_err', 'z_ferr']
+        else:
+            raise ValueError('Dataframe must have at most 5 columns')
+        
+        if np.array(range).shape != (2, 2):
+            raise ValueError('Range must be a 2x2 array')
+        if bins is None:
+            bins = [df.shape[0], df.shape[1]]
+        
+        x = np.unique(df['x'])
+        y = np.unique(df['y'])
+        xbw = x[1] - x[0]
+        ybw = y[1] - y[0]
+        
+        hist, xedges, yedges = np.histogram2d(
+            df['x'],
+            df['y'],
+            weights=df['z'],
+            range=range,
+            bins=bins
+        )
+
+        histerr, _, _ = np.histogram2d(
+            df['x'],
+            df['y'],
+            weights=df['z_err']**2,
+            range=range,
+            bins=bins
+        )
+        
+        x = (xedges[1:] + xedges[:-1]) / 2.
+        y = (yedges[1:] + yedges[:-1]) / 2.
+
+        norm = (x[1] - x[0]) / xbw * (y[1] - y[0]) / ybw if normalize else 1.
+        hist /= norm
+        histerr = np.sqrt(histerr) / norm
+
+        xx, yy = np.meshgrid(x, y, indexing='ij')
+        return pd.DataFrame({
+            'x' : xx.flatten(),
+            'y' : yy.flatten(),
+            'z' : hist.flatten(),
+            'z_err' : histerr.flatten(),
+            'z_ferr' : np.divide(histerr.flatten(), hist.flatten(), out=np.zeros_like(hist.flatten()), where=hist.flatten()!=0)
         })
 
     @staticmethod
