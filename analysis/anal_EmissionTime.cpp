@@ -18,7 +18,8 @@ int main(int argc, char *argv[])
     double betacms = Physics::GetReactionBeta(beam_mass, target_mass, argparser.beam_energy, argparser.beamA);
     double rapidity_beam = Physics::GetBeamRapidity(beam_mass, target_mass, argparser.beam_energy, argparser.beamA);
 
-    PmagEmissionTime *hist = new PmagEmissionTime("table21t");
+    PmagEmissionTime *hist_pmag_time = new PmagEmissionTime("table21t");
+    RmagEmissionTime *hist_rmag_time = new RmagEmissionTime("table21t");
 
     for (int ievt = 0; ievt < chain->GetEntries(); ievt++)
     {
@@ -35,15 +36,19 @@ int main(int argc, char *argv[])
             Particle particle(amd.N[ip], amd.Z[ip], amd.px[ip], amd.py[ip], amd.pz[ip], mass);
             particle.SetXYZT(amd.x[ip], amd.y[ip], amd.z[ip], amd.t[ip], "cms");
             particle.Initialize(betacms, rapidity_beam);
-            hist->Fill(particle, 1.);
+            hist_pmag_time->Fill(particle, 1.);
+            hist_rmag_time->Fill(particle, 1.);
         }
     }
+
+    hist_pmag_time->Normalize(chain->GetEntries());
+    hist_rmag_time->Normalize(chain->GetEntries());
 
     // saving results
     TFile *outputfile = new TFile(argparser.output_file.c_str(), "RECREATE");
     outputfile->cd();
-    hist->Normalize(chain->GetEntries());
-    hist->Write();
+    hist_pmag_time->Write();
+    hist_rmag_time->Write();
     outputfile->Write();
     outputfile->Close();
 }

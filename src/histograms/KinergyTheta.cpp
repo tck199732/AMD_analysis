@@ -3,6 +3,7 @@
 KinergyTheta::KinergyTheta(const std::string &suffix, const std::string &frame) : BaseHistograms(suffix)
 {
     this->frame = frame;
+    this->name = Form("h2_KinergyTheta_%s_%s", frame.c_str(), suffix.c_str());
     for (auto &pn : this->PARTICLENAMES)
     {
         std::string hname = Form("h2_KinergyTheta_%s_%s_%s", frame.c_str(), suffix.c_str(), pn.c_str());

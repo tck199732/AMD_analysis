@@ -76,4 +76,11 @@ public:
     PmagEmissionTime(const std::string &suffix);
     void Fill(const Particle &particle, const double &weight);
 };
+
+class RmagEmissionTime : public BaseHistograms
+{
+public:
+    RmagEmissionTime(const std::string &suffix);
+    void Fill(const Particle &particle, const double &weight);
+};
 #endif
